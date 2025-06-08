@@ -14,6 +14,12 @@ ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 ij_kotlin_name_count_to_use_star_import = 2147483647
 ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
+disabled_rules=experimental:argument-list-wrapping,experimental:comment-wrapping
+ktlint_experimental=true
+
+[*.kts]
+disabled_rules=experimental:argument-list-wrapping,experimental:comment-wrapping
+ktlint_experimental=true
 
 [*.properties]
 charset = utf-8
