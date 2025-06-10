@@ -28,13 +28,13 @@ android {
     }
 }
 
-//kotlinter {
-//    experimentalRules = true
-//    disabledRules = arrayOf(
-//        "experimental:argument-list-wrapping", // Doesn't play well with Android Studio
-//        "experimental:comment-wrapping",
-//    )
-//}
+kotlinter {
+    experimentalRules = true
+    disabledRules = arrayOf(
+        "experimental:argument-list-wrapping", // Doesn't play well with Android Studio
+        "experimental:comment-wrapping",
+    )
+}
 
 dependencies {
     compileOnly(versionCatalogs.named("libs").findBundle("common").get())
