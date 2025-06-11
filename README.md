@@ -8,7 +8,7 @@
 
 Uncommon extensions compatible with [various apps](https://pbs.twimg.com/media/GjdLNmNWAAAA_es?format=jpg&name=medium).
 
-[Click to add Repo to app](https://intradeus.github.io/http-protocol-redirector/?r=tachiyomi://add-repo?url=https://raw.githubusercontent.com/wasu-code/wsu-mihon-extensions/refs/heads/repo/index.min.json)
+[Click to add Repo to app](https://intradeus.github.io/http-protocol-redirector/?r=tachiyomi://add-repo?url=https://raw.githubusercontent.com/wasu-code/wsu-mihon-extensions/repo/index.min.json)
 
 
 # Featured extensions 
