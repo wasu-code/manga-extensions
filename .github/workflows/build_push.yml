@@ -103,6 +103,7 @@ jobs:
         with:
           ref: repo
           path: repo
+          persist-credentials: true # Required for pushing
 
       - name: Deploy repo
         run: |
