@@ -10,8 +10,8 @@
     "sources": [
       {
         "name": "AnyWeb",
-        "lang": "all",
-        "id": "3666215744278508084",
+        "lang": "other",
+        "id": "7176175498010137989",
         "baseUrl": "",
         "versionId": 1
       }
@@ -28,8 +28,8 @@
     "sources": [
       {
         "name": "Local PDF",
-        "lang": "all",
-        "id": "8883628745311607668",
+        "lang": "other",
+        "id": "5642680442140205436",
         "baseUrl": "",
         "versionId": 1
       }
