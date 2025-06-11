@@ -108,6 +108,6 @@ jobs:
       - name: Deploy repo
         run: |
           cd repo
-          ../main/.github/scripts/commit-repo.
+          ../main/.github/scripts/commit-repo.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
