@@ -1,3 +1,6 @@
+permissions:
+  contents: write
+
 name: CI
 
 on:
@@ -109,5 +112,3 @@ jobs:
         run: |
           cd repo
           ../main/.github/scripts/commit-repo.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
