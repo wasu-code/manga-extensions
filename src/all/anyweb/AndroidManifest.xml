@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".all.anyweb.AnyWebUrlActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Accepts ALL URLs with any host, any path -->
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+
+        </activity>
+        <activity
+            android:name=".all.anyweb.AnyWebIndexUrlActivity"
+            android:label="Tachiyomi: Chapter Index"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Accepts ALL URLs with any host, any path -->
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+
+        </activity>
+    </application>
+
+</manifest>
