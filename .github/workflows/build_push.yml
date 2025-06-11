@@ -26,8 +26,12 @@ jobs:
       - name: Checkout main branch
         uses: actions/checkout@v4
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: Make Gradle wrapper and scripts executable
+        run: |
+          chmod +x ./gradlew
+          chmod +x .github/scripts/move-apks.sh
+          chmod +x .github/scripts/commit-repo.sh
+          chmod +x .github/scripts/create-repo.sh
 
       - name: Set up JDK
         uses: actions/setup-java@v4
