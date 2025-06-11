@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Tachiyomi: Web Scraper",
+    "pkg": "eu.kanade.tachiyomi.extension.all.anyweb",
+    "apk": "tachiyomi-all.anyweb-v1.4.2.apk",
+    "lang": "all",
+    "code": 2,
+    "version": "1.4.2",
+    "nsfw": 0,
+    "sources": [
+      {
+        "name": "AnyWeb",
+        "lang": "all",
+        "id": "3666215744278508084",
+        "baseUrl": "",
+        "versionId": 1
+      }
+    ]
+  },
+  {
+    "name": "Tachiyomi: Local PDF",
+    "pkg": "eu.kanade.tachiyomi.extension.all.localpdf",
+    "apk": "tachiyomi-all.localpdf-v1.4.2.apk",
+    "lang": "all",
+    "code": 2,
+    "version": "1.4.2",
+    "nsfw": 0,
+    "sources": [
+      {
+        "name": "Local PDF",
+        "lang": "all",
+        "id": "8883628745311607668",
+        "baseUrl": "",
+        "versionId": 1
+      }
+    ]
+  }
+]
