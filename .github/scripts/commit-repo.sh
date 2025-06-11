@@ -8,6 +8,7 @@ git status
 if [ -n "$(git status --porcelain)" ]; then
     git add .
     git commit -m "Update extensions repo"
+    git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/wasu-code/wsu-mihon-extensions.git
     git push
 else
     echo "No changes to commit"
