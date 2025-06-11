@@ -17,22 +17,22 @@ Uncommon extensions compatible with [various apps](https://pbs.twimg.com/media/G
 
 <table>
   <tr>
-    <td style="width:50%; text-align:center;">
+    <td width="50%" align="center">
       <img src="./src/all/anyweb/res/mipmap-xxxhdpi/ic_launcher.png" width="60"/><br/>
       <strong>AnyWeb</strong>
     </td>
-    <td style="width:50%; text-align:center;">
+    <td width="50%" align="center">
       <img src="./src/all/localpdf/res/mipmap-xxxhdpi/ic_launcher.png" width="60"/><br/>
       <strong>Local PDF</strong>
     </td>
   </tr>
   <tr>
     <td>
-      <strong>Parse images from any website.</strong><br/><br/>
+      <div align="center"><strong>Parse images from any website.</strong></div><br/><br/>
       While it may not be 100% reliable (that’s what standard extensions are for!), it can come in handy when dealing with blog posts or websites that aren’t focused on manga but still have that one post you want to read inside your app.
     </td>
     <td>
-      <strong>Open local PDFs</strong><br/><br/>
+      <div align="center"><strong>Open local PDFs</strong></div><br/><br/>
       Open PDFs without needing to convert them to ZIP/CBZ by storing them in the <code>/localpdf</code> directory. Then use it similarly to the "Local source".
     </td>
   </tr>
