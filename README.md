@@ -8,21 +8,42 @@
 
 Uncommon extensions compatible with [various apps](https://pbs.twimg.com/media/GjdLNmNWAAAA_es?format=jpg&name=medium).
 
-[Click to add Repo to app](https://intradeus.github.io/http-protocol-redirector/?r=tachiyomi://add-repo?url=https://raw.githubusercontent.com/wasu-code/wsu-mihon-extensions/repo/index.min.json)
+[`Click to add Repo to app`](https://intradeus.github.io/http-protocol-redirector/?r=tachiyomi://add-repo?url=https://raw.githubusercontent.com/wasu-code/wsu-mihon-extensions/repo/index.min.json)
 
 
 # Featured extensions 
 
 </div>
 
-| <img src="./src/all/anyweb/res/mipmap-xxxhdpi/ic_launcher.png" width="80"/><br/>AnyWeb | <img src="./src/all/localpdf/res/mipmap-xxxhdpi/ic_launcher.png" width="80"/><br/>Local PDF |
-|:---:|:---:|
-| **Parse images from any website**.<br/>While it may not be 100% reliable (that’s what standard extensions are for!), it can come in handy when dealing with blog posts or websites that aren’t focused on manga but still have that one post you want to read inside your app. | **Open PDFs** without needing to convert them to ZIP/CBZ by storing them in the /localpdf directory. Then use it similarly to the Local source. |
+<table>
+  <tr>
+    <td style="width:50%; text-align:center;">
+      <img src="./src/all/anyweb/res/mipmap-xxxhdpi/ic_launcher.png" width="60"/><br/>
+      <strong>AnyWeb</strong>
+    </td>
+    <td style="width:50%; text-align:center;">
+      <img src="./src/all/localpdf/res/mipmap-xxxhdpi/ic_launcher.png" width="60"/><br/>
+      <strong>Local PDF</strong>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <strong>Parse images from any website.</strong><br/><br/>
+      While it may not be 100% reliable (that’s what standard extensions are for!), it can come in handy when dealing with blog posts or websites that aren’t focused on manga but still have that one post you want to read inside your app.
+    </td>
+    <td>
+      <strong>Open local PDFs</strong><br/><br/>
+      Open PDFs without needing to convert them to ZIP/CBZ by storing them in the <code>/localpdf</code> directory. Then use it similarly to the "Local source".
+    </td>
+  </tr>
+</table>
 
 
 # Usage
 
-...
+> [!IMPORTANT]  
+> Most of extensions have language set to "other". Make sure you **don't have it filtered out** on extension list.  
+> `🧭Browse » ⋮ » Filter`
 
 ## License
 
