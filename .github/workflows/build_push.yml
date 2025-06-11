@@ -85,9 +85,9 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x .github/scripts/move-apks.sh
-          chmod +x .github/scripts/commit-repo.sh
-          chmod +x .github/scripts/create-repo.sh
+          chmod +x ./.github/scripts/move-apks.sh
+          chmod +x ./.github/scripts/commit-repo.sh
+          chmod +x ./.github/scripts/create-repo.sh
 
       - name: Create repo artifacts
         run: |
