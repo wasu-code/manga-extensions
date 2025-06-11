@@ -36,7 +36,7 @@ class LocalPDF : HttpSource(), ConfigurableSource {
     }
 
     override val name = "Local PDF"
-    override val lang = "all"
+    override val lang = "other"
     override val supportsLatest = false
     override val baseUrl: String = ""
 
