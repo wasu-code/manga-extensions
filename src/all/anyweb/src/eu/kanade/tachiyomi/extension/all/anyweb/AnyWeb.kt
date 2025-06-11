@@ -34,7 +34,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
     override val name = "AnyWeb"
     override val baseUrl = "" // Placeholder, URLs come from user input
-    override val lang = "all"
+    override val lang = "other"
     override val supportsLatest = false
 
     private val preferences: SharedPreferences by getPreferencesLazy()
