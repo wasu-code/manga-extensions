@@ -106,7 +106,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             val excludeSelector = preferences.getString("INDEX_EXCLUDE_SELECTOR", null) ?: EXCLUDE_SELECTOR_DEFAULTS
             document.select(excludeSelector).forEach { it.remove() }
 
-            val maxDepth = 3
+            val maxDepth = preferences.getString("INDEX_DEPTH", null)?.toIntOrNull() ?: 3
 
             val selectors = mutableListOf<String>()
             val weights = mutableListOf<Int>()
