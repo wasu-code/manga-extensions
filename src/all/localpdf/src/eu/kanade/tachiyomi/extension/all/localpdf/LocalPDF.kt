@@ -15,6 +15,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceScreen
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.UnmeteredSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -28,7 +29,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 @Suppress("unused")
-class LocalPDF : HttpSource(), ConfigurableSource {
+class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
 
     companion object {
         /** Extension package name */
@@ -53,7 +54,7 @@ class LocalPDF : HttpSource(), ConfigurableSource {
     }
 
     private val scale = preferences.getString("SCALE", null)?.toIntOrNull() ?: 2
-    override val client = network.client.newBuilder()
+    override val client = super.client.newBuilder()
         .addInterceptor(PdfPageInterceptor(context, getInputDir(), scale))
         .build()
 
