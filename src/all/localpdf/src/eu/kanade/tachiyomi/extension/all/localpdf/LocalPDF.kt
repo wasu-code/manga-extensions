@@ -27,6 +27,7 @@ import okhttp3.Request
 import okhttp3.Response
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import kotlin.time.Duration.Companion.days
 
 @Suppress("unused")
 class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
@@ -34,11 +35,17 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     companion object {
         /** Extension package name */
         const val PACKAGE_NAME = "eu.kanade.tachiyomi.extension.all.localpdf"
+        private val LATEST_THRESHOLD = 7.days.inWholeMilliseconds
+    }
+
+    enum class Listing {
+        POPULAR,
+        LATEST,
     }
 
     override val name = "Local PDF"
     override val lang = "other"
-    override val supportsLatest = false
+    override val supportsLatest = true
     override val baseUrl: String = ""
 
     private val context = Injekt.get<Application>()
@@ -59,14 +66,48 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         .build()
 
     @Suppress("unused")
-    suspend fun getPopularManga(page: Int): MangasPage {
+    suspend fun getPopularManga(page: Int): MangasPage = getManga(page, "", Listing.POPULAR)
+
+    @Suppress("unused")
+    suspend fun getLatestUpdates(page: Int): MangasPage = getManga(page, "", Listing.LATEST)
+
+    @Suppress("unused")
+    suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage = getManga(page, query, Listing.POPULAR)
+
+    private suspend fun getManga(page: Int, query: String, listing: Listing): MangasPage {
         val inputDir = getInputDir() ?: throw IllegalStateException("Input directory URI is not set.\nPlease set it first in the extension's settings.")
-        val mangaDirs = inputDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
+
+        val lastModifiedLimit = if (listing == Listing.LATEST) {
+            System.currentTimeMillis() - LATEST_THRESHOLD
+        } else {
+            0L
+        }
+
+        val mangaDirs = inputDir.listFiles()
+            // Filter out files that are hidden and is not a folder
+            ?.filter { it.isDirectory && !it.name.orEmpty().startsWith('.') }
+            ?.distinctBy { it.name }
+            ?.filter {
+                if (lastModifiedLimit == 0L && query.isBlank()) {
+                    true // Popular (all)
+                } else if (lastModifiedLimit == 0L) {
+                    it.name.orEmpty().contains(query, ignoreCase = true) // Search
+                } else {
+                    it.lastModified() >= lastModifiedLimit // Latest
+                }
+            }
+            ?.sortedByDescending(UniFile::lastModified)
+            ?: emptyList()
 
         val mangaList = mangaDirs.map { dir ->
             SManga.create().apply {
                 title = dir.name ?: "Unknown"
                 url = dir.name ?: "unknown"
+
+                val coverFile = getOrCreateCover(dir)
+                coverFile?.let {
+                    thumbnail_url = it.uri.toString()
+                }
             }
         }
 
@@ -74,20 +115,7 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     }
 
     @Suppress("unused")
-    suspend fun getMangaDetails(manga: SManga): SManga {
-        val inputDir = getInputDir()
-        val mangaDir = inputDir?.findFile(manga.url)?.takeIf { it.isDirectory }
-
-        if (mangaDir != null) {
-            val coverFile = getOrCreateCover(mangaDir)
-
-            coverFile?.let {
-                manga.thumbnail_url = it.uri.toString()
-            }
-        }
-
-        return manga
-    }
+    suspend fun getMangaDetails(manga: SManga): SManga = manga
 
     private fun getOrCreateCover(mangaDir: UniFile): UniFile? {
         val existingCover = mangaDir.listFiles()
