@@ -135,15 +135,22 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         val inputDir = getInputDir()
         val mangaDir = inputDir?.findFile(manga.url)?.takeIf { it.isDirectory }
 
-        val pdfFiles = mangaDir?.listFiles()
+        val pdfFilesAndNumbers = mangaDir?.listFiles()
             ?.filter { it.name?.endsWith(".pdf", ignoreCase = true) == true }
-            ?.sortedByDescending { it.name?.lowercase() }
+            ?.mapNotNull { pdf ->
+                val chapterName = pdf.name?.removeSuffix(".pdf") ?: return@mapNotNull null
+                val chapterNumber = ChapterRecognition.parseChapterNumber(manga.title, chapterName)
+                Pair(pdf, chapterNumber)
+            }
+            ?.sortedByDescending { it.second }
             ?: emptyList()
 
-        return pdfFiles.map { pdf ->
+        return pdfFilesAndNumbers.map { (pdf, chapterNumber) ->
             SChapter.create().apply {
                 name = pdf.name?.removeSuffix(".pdf") ?: "chapter"
                 url = "${manga.url}/${pdf.name}"
+                date_upload = pdf.lastModified()
+                chapter_number = chapterNumber.toFloat()
             }
         }
     }
