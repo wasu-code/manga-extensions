@@ -15,6 +15,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceScreen
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.UnmeteredSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -26,18 +27,25 @@ import okhttp3.Request
 import okhttp3.Response
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import kotlin.time.Duration.Companion.days
 
 @Suppress("unused")
-class LocalPDF : HttpSource(), ConfigurableSource {
+class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
 
     companion object {
         /** Extension package name */
         const val PACKAGE_NAME = "eu.kanade.tachiyomi.extension.all.localpdf"
+        private val LATEST_THRESHOLD = 7.days.inWholeMilliseconds
+    }
+
+    enum class Listing {
+        POPULAR,
+        LATEST,
     }
 
     override val name = "Local PDF"
     override val lang = "other"
-    override val supportsLatest = false
+    override val supportsLatest = true
     override val baseUrl: String = ""
 
     private val context = Injekt.get<Application>()
@@ -53,19 +61,54 @@ class LocalPDF : HttpSource(), ConfigurableSource {
     }
 
     private val scale = preferences.getString("SCALE", null)?.toIntOrNull() ?: 2
-    override val client = network.client.newBuilder()
+    override val client = super.client.newBuilder()
         .addInterceptor(PdfPageInterceptor(context, getInputDir(), scale))
         .build()
 
     @Suppress("unused")
-    suspend fun getPopularManga(page: Int): MangasPage {
+    suspend fun getPopularManga(page: Int): MangasPage = getManga(page, "", Listing.POPULAR)
+
+    @Suppress("unused")
+    suspend fun getLatestUpdates(page: Int): MangasPage = getManga(page, "", Listing.LATEST)
+
+    @Suppress("unused")
+    suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage = getManga(page, query, Listing.POPULAR)
+
+    private suspend fun getManga(page: Int, query: String, listing: Listing): MangasPage {
         val inputDir = getInputDir() ?: throw IllegalStateException("Input directory URI is not set.\nPlease set it first in the extension's settings.")
-        val mangaDirs = inputDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
+
+        val lastModifiedLimit = if (listing == Listing.LATEST) {
+            System.currentTimeMillis() - LATEST_THRESHOLD
+        } else {
+            0L
+        }
+
+        val mangaDirs = inputDir.listFiles()
+            // Filter out files that are hidden and is not a folder
+            ?.filter { it.isDirectory && !it.name.orEmpty().startsWith('.') }
+            ?.distinctBy { it.name }
+            ?.filter {
+                if (lastModifiedLimit == 0L && query.isBlank()) {
+                    true // Popular (all)
+                } else if (lastModifiedLimit == 0L) {
+                    it.name.orEmpty().contains(query, ignoreCase = true) // Search
+                } else {
+                    it.lastModified() >= lastModifiedLimit // Latest
+                }
+            }
+            ?.sortedByDescending(UniFile::lastModified)
+            ?: emptyList()
 
         val mangaList = mangaDirs.map { dir ->
             SManga.create().apply {
                 title = dir.name ?: "Unknown"
                 url = dir.name ?: "unknown"
+
+                val coverFile = getOrCreateCover(dir)
+                coverFile?.let {
+                    thumbnail_url = it.uri.toString()
+                }
+                initialized = true
             }
         }
 
@@ -74,18 +117,13 @@ class LocalPDF : HttpSource(), ConfigurableSource {
 
     @Suppress("unused")
     suspend fun getMangaDetails(manga: SManga): SManga {
-        val inputDir = getInputDir()
-        val mangaDir = inputDir?.findFile(manga.url)?.takeIf { it.isDirectory }
-
-        if (mangaDir != null) {
-            val coverFile = getOrCreateCover(mangaDir)
-
+        val mangaDir = getInputDir()?.findFile(manga.url) ?: return manga
+        val coverFile = getOrCreateCover(mangaDir)
+        return manga.apply {
             coverFile?.let {
-                manga.thumbnail_url = it.uri.toString()
+                thumbnail_url = it.uri.toString()
             }
         }
-
-        return manga
     }
 
     private fun getOrCreateCover(mangaDir: UniFile): UniFile? {
@@ -134,15 +172,22 @@ class LocalPDF : HttpSource(), ConfigurableSource {
         val inputDir = getInputDir()
         val mangaDir = inputDir?.findFile(manga.url)?.takeIf { it.isDirectory }
 
-        val pdfFiles = mangaDir?.listFiles()
+        val pdfFilesAndNumbers = mangaDir?.listFiles()
             ?.filter { it.name?.endsWith(".pdf", ignoreCase = true) == true }
-            ?.sortedByDescending { it.name?.lowercase() }
+            ?.mapNotNull { pdf ->
+                val chapterName = pdf.name?.removeSuffix(".pdf") ?: return@mapNotNull null
+                val chapterNumber = ChapterRecognition.parseChapterNumber(manga.title, chapterName)
+                Pair(pdf, chapterNumber)
+            }
+            ?.sortedByDescending { it.second }
             ?: emptyList()
 
-        return pdfFiles.map { pdf ->
+        return pdfFilesAndNumbers.map { (pdf, chapterNumber) ->
             SChapter.create().apply {
                 name = pdf.name?.removeSuffix(".pdf") ?: "chapter"
                 url = "${manga.url}/${pdf.name}"
+                date_upload = pdf.lastModified()
+                chapter_number = chapterNumber.toFloat()
             }
         }
     }

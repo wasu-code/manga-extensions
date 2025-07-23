@@ -1,5 +1,3 @@
-### Please give the repo a :star:
-
 <div align="center">
 
 <img src="./.github/assets/logo.png" alt="repo logo" width="80"/>
@@ -44,6 +42,9 @@ Uncommon extensions compatible with [various apps](https://pbs.twimg.com/media/G
 > [!IMPORTANT]  
 > Most of extensions have language set to "other". Make sure you **don't have it filtered out** on extension list.  
 > `🧭Browse » ⋮ » Filter`
+
+### Please give the repo a :star:
+![Visit counter](https://count.getloli.com/@Kuchihige?theme=capoo-2)
 
 ## License
 
