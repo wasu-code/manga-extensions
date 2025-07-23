@@ -108,6 +108,7 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
                 coverFile?.let {
                     thumbnail_url = it.uri.toString()
                 }
+                initialized = true
             }
         }
 
@@ -115,7 +116,15 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     }
 
     @Suppress("unused")
-    suspend fun getMangaDetails(manga: SManga): SManga = manga
+    suspend fun getMangaDetails(manga: SManga): SManga {
+        val mangaDir = getInputDir()?.findFile(manga.url) ?: return manga
+        val coverFile = getOrCreateCover(mangaDir)
+        return manga.apply {
+            coverFile?.let {
+                thumbnail_url = it.uri.toString()
+            }
+        }
+    }
 
     private fun getOrCreateCover(mangaDir: UniFile): UniFile? {
         val existingCover = mangaDir.listFiles()
