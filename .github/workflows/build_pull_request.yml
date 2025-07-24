@@ -20,6 +20,9 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@v4
 
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
