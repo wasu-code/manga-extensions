@@ -253,7 +253,7 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
             title = ""
             val appName = context.applicationInfo.loadLabel(context.packageManager)
             summary = """Example folder structure:
-              /storage/emulated/0/${appName}/localpdf/
+              /storage/emulated/0/$appName/localpdf/
               ├── seriesName1/
               │   ├── ch1.pdf
               │   └── ch2.pdf
