@@ -222,8 +222,9 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         EditTextPreference(screen.context).apply {
             key = "MIHON_URI"
-            title = "URI to Mihon root directory"
-            dialogTitle = "[...]/Mihon"
+            val appName = context.applicationInfo.loadLabel(context.packageManager)
+            title = "URI to $appName's root directory"
+            dialogTitle = "[...]/$appName"
             summary = """
                 Same as in "Settings » Data and storage » Storage location".
                 Current: ${preferences.getString(key, "Not set")}
@@ -250,8 +251,9 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         EditTextPreference(screen.context).apply {
             key = "INFO_INPUT_DIR"
             title = ""
+            val appName = context.applicationInfo.loadLabel(context.packageManager)
             summary = """Example folder structure:
-              /storage/emulated/0/Mihon/localpdf/
+              /storage/emulated/0/${appName}/localpdf/
               ├── seriesName1/
               │   ├── ch1.pdf
               │   └── ch2.pdf
