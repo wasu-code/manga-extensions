@@ -3,7 +3,7 @@ set -e
 
 cat ../main/repo/index.json
 cat ./index.json
-rsync -a --delete --exclude .git --exclude .gitignore --exclude README.md --exclude repo.json ../main/repo/ .
+rsync -avv --delete --exclude .git --exclude .gitignore --exclude README.md --exclude repo.json ../main/repo/ .
 cat ../main/repo/index.json
 cat ./index.json
 git config --global user.email "github-actions[bot]@users.noreply.github.com"
