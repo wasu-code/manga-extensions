@@ -93,6 +93,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
                     SManga.create().apply {
                         title = "Click to load"
                         url = websiteUrl.takeIf { !isIndex } ?: wrapUrl(websiteUrl, indexDepth)
+                        genre = "index".takeIf { isIndex }
                     },
                 ),
                 false,
