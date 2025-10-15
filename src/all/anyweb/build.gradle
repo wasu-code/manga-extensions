@@ -1,7 +1,7 @@
 ext {
     extName = "AnyWebpage Scraper"
     extClass = ".AnyWeb"
-    extVersionCode = 2
+    extVersionCode = 3
     isNsfw = false
 }
 

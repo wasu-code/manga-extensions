@@ -6,6 +6,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -22,6 +23,12 @@ import org.jsoup.nodes.Element
 import rx.Observable
 
 val urlRegex = """^(?:https?://)?(?:[\w-]+\.)+[a-z]{2,6}(?:/\S*)?$""".toRegex()
+
+/** Has two capturing groups: optional index depth and url.
+ * If index depth is provided should be treated as index.
+ * Used when saving anime URL
+ */
+val anyWebUrlRegex = """^http://(?:(\d+)\.)?anyweb\.invalid/(.*)$""".toRegex()
 const val INDEX_PREFIX = "index:"
 
 const val EXCLUDE_SELECTOR_DEFAULTS = "nav, footer, header, aside, .comments"
@@ -30,6 +37,7 @@ const val EXCLUDE_URL_KEYWORDS_DEFAULTS = "avatar, icon, profile"
 const val MAX_DIMENSIONS_DEFAULTS = "301"
 const val MIN_SIZE_DEFAULTS = "10000"
 
+@Suppress("unused")
 class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
     override val name = "AnyWeb"
@@ -39,25 +47,60 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
     private val preferences: SharedPreferences by getPreferencesLazy()
 
+    /** Wrap url with dummy URL to save index parsing params for index URL */
+    private fun wrapUrl(url: String, indexDepth: Int?): String {
+        if (indexDepth == null) throw IllegalArgumentException("Index depth cannot be null")
+        return "http://$indexDepth.anyweb.invalid/$url"
+    }
+
+    /** Extracts the parsing strategy and URL from manga URL.
+     * @param url The potentially wrapped manga URL to analyze.
+     *
+     * @return A [Triple] containing:
+     *  - **first** → `Boolean` true if the URL is index URL.
+     *  - **second** → `Int?` optional index depth or `null` if none.
+     *  - **third** → `String` original URL.
+     *
+     * */
+    fun unwrapUrl(url: String): Triple<Boolean, Int?, String> {
+        val match = anyWebUrlRegex.matchEntire(url)
+
+        // Standalone chapter
+        if (match == null) return Triple(false, null, url)
+
+        // Index of chapters
+        val (indexDepthStr, innerUrl) = match.destructured
+        val indexDepth = indexDepthStr.toIntOrNull()
+        val isIndex = indexDepth != null
+        return Triple(isIndex, indexDepth, innerUrl)
+    }
+
+    override fun getMangaUrl(manga: SManga): String = unwrapUrl(manga.url).third
+
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> {
         val websiteUrl = query.removePrefix(INDEX_PREFIX).let { stripped ->
             require(urlRegex.matches(stripped)) { "Query is not a URL" }
-            if (stripped.startsWith("http://") || stripped.startsWith("https://")) stripped else "http://$stripped"
+            stripped.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                ?: "http://$stripped"
         }
+
+        val isIndex = query.startsWith(INDEX_PREFIX) || filters.find { it is ParsingStrategyFilter }?.state == 1
+        val indexDepth: Int? = (filters.find { it is IndexDepthFilter }?.state as String).toIntOrNull()
 
         return Observable.just(
             MangasPage(
                 listOf(
                     SManga.create().apply {
                         title = "Click to load"
-                        url = websiteUrl
-                        genre = if (query.startsWith(INDEX_PREFIX)) "index" else websiteUrl // Will serve as storage for chapter list
+                        url = websiteUrl.takeIf { !isIndex } ?: wrapUrl(websiteUrl, indexDepth)
                     },
                 ),
                 false,
             ),
         )
     }
+
+    override fun mangaDetailsRequest(manga: SManga): Request = GET(unwrapUrl(manga.url).third)
 
     override fun mangaDetailsParse(document: Document): SManga {
         return SManga.create().apply {
@@ -70,43 +113,58 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             thumbnail_url = document.selectFirst("meta[property=og:image]")?.attr("content")
                 ?: document.selectFirst("meta[name=image]")?.attr("content")
                 ?: document.selectFirst("img")?.attr("src")
-            url = document.location()
         }
     }
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
-        // choose chapter parsing strategy
-        return if (manga.genre
+        val isIndex = unwrapUrl(manga.url).first
+        val isLegacyIndex = manga.genre
             ?.split(",")
             ?.map { it.trim().lowercase() }
             ?.contains("index") == true
-        ) {
-            chaptersFromIndex(manga)
+
+        val genreLinks = manga.genre?.split(",")?.filter { it.startsWith("http") } ?: emptyList()
+
+        // choose chapter parsing strategy
+        return if (isIndex || isLegacyIndex) {
+            chaptersFromIndex(manga.url)
+        } else if (genreLinks.isNotEmpty()) {
+            chaptersFromList(genreLinks)
         } else {
-            chaptersFromGenre(manga)
+            Observable.just(
+                listOf(
+                    SChapter.create().apply {
+                        name = "Chapter"
+                        url = manga.url
+                    },
+                ),
+            )
         }
     }
 
-    private fun chaptersFromGenre(manga: SManga): Observable<List<SChapter>> {
+    private fun chaptersFromList(urlList: List<String>): Observable<List<SChapter>> {
         return Observable.just(
-            manga.genre?.split(",")?.map { it.trim() }?.mapIndexed { index, url ->
+            urlList.mapIndexed { index, url ->
                 SChapter.create().apply {
                     name = "Chapter ${index + 1}"
-                    this.url = url
+                    this.url = url.trim()
                 }
-            }?.reversed() ?: emptyList(),
+            }.reversed(),
         )
     }
 
-    private fun chaptersFromIndex(manga: SManga): Observable<List<SChapter>> {
+    private fun chaptersFromIndex(indexUrl: String): Observable<List<SChapter>> {
         return Observable.fromCallable {
-            val document = client.newCall(GET(manga.url, headers)).execute().asJsoup()
+            val (_, indexDepth, url) = unwrapUrl(indexUrl)
+            val document = client.newCall(GET(url, headers)).execute().asJsoup()
 
             // Ignore links in footer/header
             val excludeSelector = preferences.getString("INDEX_EXCLUDE_SELECTOR", null) ?: EXCLUDE_SELECTOR_DEFAULTS
             document.select(excludeSelector).forEach { it.remove() }
 
-            val maxDepth = preferences.getString("INDEX_DEPTH", null)?.toIntOrNull() ?: 3
+            val maxDepth = indexDepth
+                ?: preferences.getString("INDEX_DEPTH", null)?.toIntOrNull()
+                ?: 3
 
             val selectors = mutableListOf<String>()
             val weights = mutableListOf<Int>()
@@ -142,7 +200,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             val chapters = bestContainer?.select("a")?.mapIndexed { index, a ->
                 SChapter.create().apply {
                     name = a.text().ifBlank { "Untitled" }
-                    url = a.absUrl("href")
+                    this.url = a.absUrl("href")
                     chapter_number = index.toFloat()
                 }
             } ?: emptyList()
@@ -259,6 +317,14 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
         }
     }
 
+    override fun getFilterList(): FilterList = FilterList(
+        ParsingStrategyFilter(),
+        IndexDepthFilter(preferences.getString("INDEX_DEPTH", null) ?: "3"),
+    )
+
+    class ParsingStrategyFilter : Filter.Select<String>("Parsing Strategy", arrayOf("Single chapter", "Index of chapters"), 0)
+    class IndexDepthFilter(default: String) : Filter.Text("Index Depth", default)
+
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         EditTextPreference(screen.context).apply {
             key = "INFO"
@@ -356,7 +422,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
         EditTextPreference(screen.context).apply {
             key = "INDEX_DEPTH"
-            title = "Index Depth"
+            title = "Default Index Depth"
             dialogTitle = "Set Index Depth"
             summary = """
                 Defines how deep the DOM is scanned to auto-detect chapter links (when searching index:<url>).
@@ -376,20 +442,6 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             title = "Index: CSS selector to exclude"
             dialogTitle = "Enter CSS selector"
             setDefaultValue(EXCLUDE_SELECTOR_DEFAULTS)
-        }.also(screen::addPreference)
-
-        EditTextPreference(screen.context).apply {
-            key = "INFO_INDEX"
-            title = "ℹ️ KNOWN ISSUES"
-            summary = """
-                🛑 Issue:
-                If user search for url and then try to prefix it with `index:` that won't work (until cache is cleared).
-                URL is the same for both index and non-index entries, so they are considered the same by the app (and therefore not fetched again).
-
-                🛠️ Fix:
-                If host app allows tag editing: add entry to library and add "index" tag.
-            """.trimIndent()
-            setEnabled(false)
         }.also(screen::addPreference)
     }
 
