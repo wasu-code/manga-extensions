@@ -3,7 +3,6 @@
 package eu.kanade.tachiyomi.extension.all.localpdf
 
 import android.app.Application
-import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -12,6 +11,7 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.widget.Toast
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.source.ConfigurableSource
@@ -220,30 +220,53 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        EditTextPreference(screen.context).apply {
+//        EditTextPreference(screen.context).apply {
+//            key = "MIHON_URI"
+//            val appName = context.applicationInfo.loadLabel(context.packageManager)
+//            title = "URI to $appName's root directory"
+//            dialogTitle = "[...]/$appName"
+//            summary = """
+//                Same as in "Settings » Data and storage » Storage location".
+//                Current: ${preferences.getString(key, "Not set")}
+//            """.trimIndent()
+//            setOnPreferenceChangeListener { preference, newValue ->
+//                val value = newValue as String
+//                preference.summary = """
+//                    Same as "Settings » Data and storage » Storage location".
+//                    Current: $value
+//                """.trimIndent()
+//                Toast.makeText(context, "Restart app to apply changes", Toast.LENGTH_LONG).show()
+//                true
+//            }
+//            setOnPreferenceClickListener {
+//                val intent = Intent().apply {
+//                    setClassName(PACKAGE_NAME, UriPickerActivity::class.java.name)
+//                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+//                }
+//                context.startActivity(intent)
+//                true
+//            }
+//        }.also(screen::addPreference)
+
+        ListPreference(screen.context).apply {
             key = "MIHON_URI"
             val appName = context.applicationInfo.loadLabel(context.packageManager)
-            title = "URI to $appName's root directory"
-            dialogTitle = "[...]/$appName"
+            title = "$appName's root directory"
             summary = """
                 Same as in "Settings » Data and storage » Storage location".
-                Current: ${preferences.getString(key, "Not set")}
+                Current: ${Uri.parse(preferences.getString(key, "Not set")).readablePath()}
             """.trimIndent()
-            setOnPreferenceChangeListener { preference, newValue ->
+            val availableUris = context.contentResolver.persistedUriPermissions
+            entries = availableUris.map { it.uri.readablePath() }.toTypedArray()
+            entryValues = availableUris.map { it.uri.toString() }.toTypedArray()
+            setDefaultValue(availableUris.firstOrNull()?.uri?.toString())
+            setOnPreferenceChangeListener { pref, newValue ->
                 val value = newValue as String
-                preference.summary = """
+                pref.summary = """
                     Same as "Settings » Data and storage » Storage location".
                     Current: $value
                 """.trimIndent()
                 Toast.makeText(context, "Restart app to apply changes", Toast.LENGTH_LONG).show()
-                true
-            }
-            setOnPreferenceClickListener {
-                val intent = Intent().apply {
-                    setClassName(PACKAGE_NAME, UriPickerActivity::class.java.name)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
                 true
             }
         }.also(screen::addPreference)
@@ -251,9 +274,9 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         EditTextPreference(screen.context).apply {
             key = "INFO_INPUT_DIR"
             title = ""
-            val appName = context.applicationInfo.loadLabel(context.packageManager)
+            val rootDir = Uri.parse(preferences.getString("MIHON_URI", "/storage/emulated/0")).readablePath()
             summary = """Example folder structure:
-              /storage/emulated/0/$appName/localpdf/
+              $rootDir/localpdf/
               ├── seriesName1/
               │   ├── ch1.pdf
               │   └── ch2.pdf
@@ -285,6 +308,9 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
             }
         }.also(screen::addPreference)
     }
+
+    fun Uri.readablePath(): String =
+        toString().substringAfter("tree/").replace("%3A", "/").replace("%2F", "/")
 
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException("Not Used")
     override fun latestUpdatesParse(response: Response): MangasPage = throw UnsupportedOperationException("Not Used")
