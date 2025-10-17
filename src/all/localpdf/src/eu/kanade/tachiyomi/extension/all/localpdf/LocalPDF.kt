@@ -220,34 +220,6 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-//        EditTextPreference(screen.context).apply {
-//            key = "MIHON_URI"
-//            val appName = context.applicationInfo.loadLabel(context.packageManager)
-//            title = "URI to $appName's root directory"
-//            dialogTitle = "[...]/$appName"
-//            summary = """
-//                Same as in "Settings » Data and storage » Storage location".
-//                Current: ${preferences.getString(key, "Not set")}
-//            """.trimIndent()
-//            setOnPreferenceChangeListener { preference, newValue ->
-//                val value = newValue as String
-//                preference.summary = """
-//                    Same as "Settings » Data and storage » Storage location".
-//                    Current: $value
-//                """.trimIndent()
-//                Toast.makeText(context, "Restart app to apply changes", Toast.LENGTH_LONG).show()
-//                true
-//            }
-//            setOnPreferenceClickListener {
-//                val intent = Intent().apply {
-//                    setClassName(PACKAGE_NAME, UriPickerActivity::class.java.name)
-//                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//                }
-//                context.startActivity(intent)
-//                true
-//            }
-//        }.also(screen::addPreference)
-
         ListPreference(screen.context).apply {
             key = "MIHON_URI"
             val appName = context.applicationInfo.loadLabel(context.packageManager)
