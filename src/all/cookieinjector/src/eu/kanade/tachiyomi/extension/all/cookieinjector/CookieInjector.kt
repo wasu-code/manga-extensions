@@ -3,9 +3,12 @@ package eu.kanade.tachiyomi.extension.all.cookieinjector
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.widget.Toast
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.NetworkHelper
@@ -16,8 +19,8 @@ import org.json.JSONObject
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-const val JS_CODE = """
-avascript:(function () {
+private const val BOOKMARKLET = """
+javascript:(function () {
   const input = document.createElement('input');
   input.value = JSON.stringify({url : window.location.href, cookie : document.cookie});
   document.body.appendChild(input);
@@ -32,6 +35,31 @@ avascript:(function () {
 })();
 """
 
+enum class BrowserInstruction(val title: String, val content: String) {
+    CHROMIUM(
+        "Chromium (eg. Chrome)",
+        """
+            1. Add any website to bookmarks
+            2. Edit this bookmark
+            3. As content/url of bookmark paste copied text
+            4. Go to target website
+            5. Click search bar and search for bookmark name
+            6. Click this bookmark (marked with ⭐ before name)
+        """.trimIndent(),
+    ),
+    GECKO(
+        "Gecko (eg. Firefox)",
+        """
+            1. Add any website to bookmarks
+            2. Edit this bookmark
+            3. As content/url of bookmark paste copied text
+            4. Go to target website
+            5. Open menu > Bookmarks
+            6. Click on the bookmark
+        """.trimIndent(),
+    ),
+}
+
 class CookieInjector : ConfigurableSource {
 
     @Suppress("unused")
@@ -42,33 +70,43 @@ class CookieInjector : ConfigurableSource {
     val lang = "all"
 
     private val context by lazy { Injekt.get<Application>() }
-
     private val network: NetworkHelper = Injekt.get()
     private val prefs: SharedPreferences =
         Injekt.get<Application>().getSharedPreferences("cookie_injector_prefs", 0)
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        ListPreference(screen.context).apply {
+            key = "BROWSER"
+            title = "Select browser to get specific instructions"
+            summary = BrowserInstruction.valueOf(prefs.getString(key, BrowserInstruction.CHROMIUM.name)!!).content
+            entries = BrowserInstruction.values().map { it.title }.toTypedArray()
+            entryValues = BrowserInstruction.values().map { it.name }.toTypedArray()
+            setDefaultValue(BrowserInstruction.CHROMIUM.name)
+            setOnPreferenceChangeListener { _, newValue ->
+                val instruction = BrowserInstruction.valueOf(newValue as String)
+                summary = instruction.content
+                true
+            }
+        }.also(screen::addPreference)
+
         SwitchPreferenceCompat(screen.context).apply {
             key = "COPY_TRIGGER"
-            title = "Tap to copy"
-            summary = """
-                1. Copy this text
-                2. Go to browser
-                3. Go to website you want to login into
-                4. While on the website:
-                    + Click the search bar
-                    + Remove everything there
-                    + Paste copied text
-                    + Go to the start of the text and add letter "j" on the beginning
-                    + Click enter
-                5. Go back here and paste cookies string down below
-            """.trimIndent() // TODO: text is too long and not fully displayed
+            title = "Tap to copy bookmarklet"
             setDefaultValue(false)
             setOnPreferenceClickListener {
+                // copy bookmarklet code
                 val clipboard = context.getSystemService("clipboard") as ClipboardManager
-                val clip = ClipData.newPlainText("Js code", JS_CODE)
+                val clip = ClipData.newPlainText("Cookie Bookmarklet", BOOKMARKLET)
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(screen.context, "📋 Example JSON copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(screen.context, "Bookmarklet copied to clipboard", Toast.LENGTH_SHORT).show()
+                // trigger opening browser
+                val intent = Intent().apply {
+                    action = Intent.ACTION_VIEW
+                    data = Uri.parse("http://about:blank")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+
                 true
             }
             setOnPreferenceChangeListener { pref, _ ->
