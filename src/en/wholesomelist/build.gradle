@@ -1,0 +1,8 @@
+ext {
+    extName = "Wholecome List"
+    extClass = ".WholesomeList"
+    extVersionCode = 1
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
