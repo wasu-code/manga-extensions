@@ -1,0 +1,13 @@
+ext {
+    extName = "Itch.io"
+    extClass = ".Itchio"
+    extVersionCode = 1
+    isNsfw = false
+}
+
+apply from: "$rootDir/common.gradle"
+
+dependencies {
+    implementation("com.github.tachiyomiorg:unifile:e0def6b3dc")
+    implementation(project(":lib:textinterceptor"))
+}
