@@ -69,6 +69,11 @@ class CookieInjector : ConfigurableSource {
     val name = "Cookie Injector"
     val lang = "all"
 
+    /**
+     * Visible name of the source.
+     */
+    override fun toString() = name
+
     private val context by lazy { Injekt.get<Application>() }
     private val network: NetworkHelper = Injekt.get()
     private val prefs: SharedPreferences =
