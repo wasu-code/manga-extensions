@@ -9,6 +9,7 @@ import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptor
 import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptorHelper
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -21,6 +22,7 @@ import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.tryParse
 import okhttp3.Request
 import okhttp3.Response
+import org.json.JSONObject
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -40,7 +42,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         .addInterceptor(TextInterceptor())
         .build()
 
-    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl?page=$page&format=html")
+    override fun popularMangaRequest(page: Int): Request = GET("https://itch.io/my-purchases")
 
 //    Sort
 // Popular             <no value>
@@ -71,6 +73,7 @@ class Itchio : HttpSource(), ConfigurableSource {
                 title = card.selectFirst(".game_title")!!.text()
                 thumbnail_url = card.selectFirst("img")?.absUrl("data-lazy_src")
                 url = card.selectFirst("a")!!.absUrl("href")
+                    .replace(Regex("/download/[^/]+/?"), "/") // fix for my-purchases page
             }
         }
 
@@ -136,17 +139,25 @@ class Itchio : HttpSource(), ConfigurableSource {
                     "/download/",
                     "/file/$fileId?source=game_download&key=",
                 )
+
+                val response = network.client.newCall(
+                    POST(downloadUrl),
+                ).execute()
+                val body = response.body?.string() ?: ""
+                val json = JSONObject(body)
+                val downloadUrl2 = json.getString("url")
+
                 SChapter.create().apply {
                     name = it.selectFirst(".upload_name .name")!!.text()
-                    url = downloadUrl
+                    url = downloadUrl2
                     date_upload = SimpleDateFormat("dd MMMM yyyy '@' HH:mm z", Locale.US)
                         .tryParse(
                             it.selectFirst(".upload_date")
                                 ?.attr("title"),
                         )
                     scanlator = listOfNotNull(
-                        "Free",
                         ownershipReason,
+                        it.selectFirst(".file_size")?.text(),
                     ).joinToString()
                 }
             }
@@ -192,7 +203,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
 
         // Show dummy page to let user know download is complete (and so it doesn't throw errors)
-        //TODO add actual dummy pages when dealing with pdf
+        // TODO add actual dummy pages when dealing with pdf
         return Observable.just(
             listOf(
                 Page(
