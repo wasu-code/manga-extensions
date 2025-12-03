@@ -192,13 +192,12 @@ class Itchio : HttpSource(), ConfigurableSource {
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not Used")
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
-        val fileName = chapter.name.lowercase()
+        val fileExtension = chapter.name.substringAfterLast(".").lowercase()
 
-        when {
+        when (fileExtension) {
             // TODO use page interceptor and pdf as lib
-            fileName.endsWith(".pdf") -> handleDownload(chapter, "localpdf")
-            fileName.endsWith(".zip") ||
-                fileName.endsWith(".cbz") -> handleDownload(chapter, "downloads/$name (${lang.uppercase()})")
+            "pdf" -> handleDownload(chapter, "localpdf")
+            in listOf("zip", "cbz", "epub") -> handleDownload(chapter, "downloads/$name (${lang.uppercase()})")
             else -> throw UnsupportedOperationException("Unsupported file format")
         }
 
