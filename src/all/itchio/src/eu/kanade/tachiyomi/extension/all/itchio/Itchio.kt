@@ -29,6 +29,8 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.getValue
 
+private const val SEPARATOR = " • "
+
 class Itchio : HttpSource(), ConfigurableSource {
     override val baseUrl = "https://itch.io/comics"
     override val lang = "all"
@@ -212,26 +214,28 @@ class Itchio : HttpSource(), ConfigurableSource {
 //                ),
 //            ),
 //        )
+
+        // Task failed successfully
         throw UnsupportedOperationException("Download completed")
     }
 
     override fun prepareNewChapter(chapter: SChapter, manga: SManga) {
-        chapter.name = manga.title + " ][ " + chapter.name
+        chapter.scanlator = chapter.scanlator + SEPARATOR + manga.title
     }
 
-    fun handleDownload(chapter: SChapter, baseFolder: String): UniFile {
+    fun handleDownload(chapter: SChapter, baseDir: String): UniFile {
+        val mangaName = chapter.scanlator?.substringAfter(SEPARATOR) ?: "Unknown"
+
         val mihonUri = preferences.getString("MIHON_URI", null)?.let { Uri.parse(it) }
             ?: throw IllegalStateException("MIHON_URI not set")
-
-        val (mangaName, _) = chapter.name.split(" ][ ")
         val downloadRoot = UniFile.fromUri(context, mihonUri) ?: throw Exception("Invalid MIHON_URI")
 
-        val base = baseFolder.split("/").fold(downloadRoot) { acc, folder ->
-            acc.findOrCreateDir(folder)
+        val base = baseDir.split("/").fold(downloadRoot) { acc, dir ->
+            acc.findOrCreateDir(dir)
         }
-        val mangaFolder = base.findOrCreateDir(mangaName)
-        // TODO
-        val chapterFile = mangaFolder.createFile("${chapter.scanlator ?: ""}_${chapter.name}") ?: throw Exception("Could not create chapter file")
+        val mangaDir = base.findOrCreateDir(mangaName)
+
+        val chapterFile = mangaDir.createFile("${chapter.scanlator}_${chapter.name}") ?: throw Exception("Could not create chapter file")
 
         // Download file contents
         downloadToFile(chapter.url, chapterFile)
@@ -247,7 +251,8 @@ class Itchio : HttpSource(), ConfigurableSource {
         val response = network.client.newCall(request).execute()
 
         if (response.code == 401) throw Exception("Unauthorized. Login in WebView")
-        if (!response.isSuccessful) throw Exception("Unexpected code $response")
+        if (response.code == 403) throw Exception("Forbidden. Refresh chapter list")
+        if (!response.isSuccessful) throw Exception("Unexpected code ${response.code}: ${response.message}")
 
         response.body.byteStream().use { input ->
             targetFile.openOutputStream().use { output ->
@@ -255,6 +260,8 @@ class Itchio : HttpSource(), ConfigurableSource {
             }
         }
     }
+
+    //TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
