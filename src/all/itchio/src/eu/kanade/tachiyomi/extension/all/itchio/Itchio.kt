@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.utils.getPreferencesLazy
+import keiyoushi.utils.parseAs
 import keiyoushi.utils.tryParse
 import okhttp3.Request
 import okhttp3.Response
@@ -42,8 +43,6 @@ class Itchio : HttpSource(), ConfigurableSource {
     override val client = network.client.newBuilder()
         .addInterceptor(TextInterceptor())
         .build()
-
-    override fun popularMangaRequest(page: Int): Request = GET("https://itch.io/my-purchases")
 
 //    Sort
 // Popular             <no value>
@@ -82,9 +81,11 @@ class Itchio : HttpSource(), ConfigurableSource {
         return MangasPage(comics, hasNextPage)
     }
 
+    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/free?page=$page&format=html")
+
     override fun popularMangaParse(response: Response): MangasPage = comicsParse(response)
 
-    override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/free?page=$page&format=html")
+    override fun latestUpdatesRequest(page: Int): Request = GET("https://itch.io/my-purchases")
 
     override fun latestUpdatesParse(response: Response): MangasPage = comicsParse(response)
 
@@ -92,9 +93,55 @@ class Itchio : HttpSource(), ConfigurableSource {
         page: Int,
         query: String,
         filters: FilterList,
-    ): Request = GET("https://itch.io/search?q=$query&classification=comic")
+    ): Request {
+        if (query.isNotBlank()) return GET("https://itch.io/search?q=$query&classification=comic")
+
+        val sortingState: Int = filters.findInstance<SortingFilter>()?.state ?: 0
+        val sorting: String = SORTING.values.elementAt(sortingState)
+
+        val priceState = filters.findInstance<PriceFilter>()?.state ?: 0
+        val price = PRICE.values.elementAt(priceState)
+
+        val tagFilters = filters.findInstance<TagsFilter>()?.state ?: emptyList()
+        val selectedTagFilters = tagFilters.filter { it.state }
+        val selectedTagNames = selectedTagFilters.map { it.name }
+        val tags = cachedTags
+            ?.filter { it.name in selectedTagNames }
+            ?.joinToString("") { it.url }
+            ?: ""
+
+        return GET("$baseUrl$sorting$price$tags")
+    }
+
+    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
 
     override fun searchMangaParse(response: Response): MangasPage = comicsParse(response)
+
+    override fun getFilterList(): FilterList {
+        try {
+            fetchTags()
+        } catch (e: Exception) {}
+        return FilterList(
+            SortingFilter(),
+            PriceFilter(),
+            TagsFilter(cachedTags?.map { it.name } ?: emptyList()),
+        )
+    }
+
+    private var cachedTags: List<Tag>? = null
+
+    private fun fetchTags() {
+        cachedTags?.let { return }
+
+        val url = "https://itch.io/tags.json?format=browse&nsfw=true&classification=comic"
+        val request = GET(url)
+        val response = client.newCall(request).execute()
+
+        val tags = response.parseAs<TagsResponse>().tags
+        val sortedTags = tags.sortedByDescending { it.primary }
+
+        cachedTags = sortedTags
+    }
 
     override fun mangaDetailsRequest(manga: SManga): Request = GET(manga.url)
 
@@ -144,7 +191,7 @@ class Itchio : HttpSource(), ConfigurableSource {
                 val response = network.client.newCall(
                     POST(downloadUrl),
                 ).execute()
-                val body = response.body?.string() ?: ""
+                val body = response.body.string()
                 val json = JSONObject(body)
                 val downloadUrl2 = json.getString("url")
 
@@ -186,7 +233,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
 
         // donation based - can't get
-        throw UnsupportedOperationException("Must purchase comic to display chapters")
+        throw UnsupportedOperationException("Purchase comic to display chapters")
     }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
@@ -261,7 +308,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
     }
 
-    //TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
+    // TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
