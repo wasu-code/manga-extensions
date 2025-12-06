@@ -7,7 +7,6 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptor
-import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptorHelper
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.source.ConfigurableSource
@@ -118,9 +117,9 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
     }
 
-    suspend fun getChapterList(manga: SManga): List<SChapter> {
-        val request = GET(manga.url)
-        val response = network.client.newCall(request).execute()
+    override fun chapterListRequest(manga: SManga): Request = GET(manga.url)
+
+    override fun chapterListParse(response: Response): List<SChapter> {
         val document = response.asJsoup()
 
         val purchasedBanner = document.selectFirst(".purchase_banner")
@@ -188,9 +187,6 @@ class Itchio : HttpSource(), ConfigurableSource {
         throw UnsupportedOperationException("Must purchase comic to display chapters")
     }
 
-    override fun chapterListRequest(manga: SManga): Request = throw UnsupportedOperationException("Not Used")
-    override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not Used")
-
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
         val fileExtension = chapter.name.substringAfterLast(".").lowercase()
 
@@ -203,45 +199,46 @@ class Itchio : HttpSource(), ConfigurableSource {
 
         // Show dummy page to let user know download is complete (and so it doesn't throw errors)
         // TODO add actual dummy pages when dealing with pdf
-        return Observable.just(
-            listOf(
-                Page(
-                    0,
-                    "",
-                    TextInterceptorHelper.createUrl(
-                        "Download completed",
-                        "Reopen the chapter to start reading",
-                    ),
-                ),
-            ),
-        )
-//        throw UnsupportedOperationException("Download completed")
+//        return Observable.just(
+//            listOf(
+//                Page(
+//                    0,
+//                    "",
+//                    TextInterceptorHelper.createUrl(
+//                        "Download completed",
+//                        "Reopen the chapter to start reading",
+//                    ),
+//                    file.uri,
+//                ),
+//            ),
+//        )
+        throw UnsupportedOperationException("Download completed")
     }
 
     override fun prepareNewChapter(chapter: SChapter, manga: SManga) {
         chapter.name = manga.title + " ][ " + chapter.name
     }
 
-    fun handleDownload(chapter: SChapter, baseFolder: String) {
+    fun handleDownload(chapter: SChapter, baseFolder: String): UniFile {
         val mihonUri = preferences.getString("MIHON_URI", null)?.let { Uri.parse(it) }
             ?: throw IllegalStateException("MIHON_URI not set")
 
         val (mangaName, _) = chapter.name.split(" ][ ")
-        val downloadRoot = UniFile.fromUri(context, mihonUri) ?: return
+        val downloadRoot = UniFile.fromUri(context, mihonUri) ?: throw Exception("Invalid MIHON_URI")
 
         val base = baseFolder.split("/").fold(downloadRoot) { acc, folder ->
             acc.findOrCreateDir(folder)
         }
         val mangaFolder = base.findOrCreateDir(mangaName)
         // TODO
-        val chapterFile = mangaFolder.createFile("${chapter.scanlator ?: ""}_${chapter.name}") ?: return
+        val chapterFile = mangaFolder.createFile("${chapter.scanlator ?: ""}_${chapter.name}") ?: throw Exception("Could not create chapter file")
 
         // Download file contents
         downloadToFile(chapter.url, chapterFile)
+        return chapterFile
     }
 
     fun UniFile.findOrCreateDir(name: String): UniFile {
-        // TODO why always create new
         return findFile(name) ?: createDirectory(name)!!
     }
 
@@ -267,7 +264,6 @@ class Itchio : HttpSource(), ConfigurableSource {
             summary = """
                 Same as in "Settings » Data and storage » Storage location".
             """.trimIndent()
-//            Current: ${Uri.parse(preferences.getString(key, "Not set")).readablePath()}
             val availableUris = context.contentResolver.persistedUriPermissions
             entries = availableUris.map { it.uri.readablePath() }.toTypedArray()
             entryValues = availableUris.map { it.uri.toString() }.toTypedArray()
