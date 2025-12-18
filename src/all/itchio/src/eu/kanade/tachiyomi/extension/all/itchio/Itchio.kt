@@ -6,10 +6,12 @@ import android.net.Uri
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -31,6 +33,8 @@ import java.util.Locale
 import kotlin.getValue
 
 private const val SEPARATOR = " • "
+private val REGEX_URL_CHAPTER = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/.+")
+private val REGEX_URL_USERPAGE = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/?$")
 
 class Itchio : HttpSource(), ConfigurableSource {
     override val baseUrl = "https://itch.io/comics"
@@ -44,26 +48,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         .addInterceptor(TextInterceptor())
         .build()
 
-//    Sort
-// Popular             <no value>
-// New & Popular       /new-and-popular
-// Top Sellers         /top-sellers
-// Top rated           /top-rated
-// Most recent         /newest
-//
-// Price
-// All     <no value>
-// Free    /free
-// On sale /on-sale
-// Paid    /store
-// $5 or less  /5-dollars-or-less
-// $15 or less /15-dollars-or-less
-//
-// Tags (multi)
-// https://itch.io/tags.json?format=browse&nsfw=true&classification=comic
-
 //    https://itch.io/my-purchases
-    // page for user listing
 
     private fun comicsParse(response: Response): MangasPage {
         val document = response.asJsoup()
@@ -89,13 +74,27 @@ class Itchio : HttpSource(), ConfigurableSource {
 
     override fun latestUpdatesParse(response: Response): MangasPage = comicsParse(response)
 
+    override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage {
+        if (query.matches(REGEX_URL_CHAPTER)) {
+            return MangasPage(listOf(SManga.create().apply { url = query }), false)
+        }
+        return super.getSearchManga(page, query, filters)
+    }
+
     override fun searchMangaRequest(
         page: Int,
         query: String,
         filters: FilterList,
     ): Request {
+        // Handle showing user page
+        if (query.matches(REGEX_URL_USERPAGE)) return GET(query)
+        val user = filters.findInstance<UserFilter>()?.state
+        if (user != null) return GET("https://$user.itch.io/")
+
+        // Handle searching
         if (query.isNotBlank()) return GET("https://itch.io/search?q=$query&classification=comic")
 
+        // Handle filtering
         val sortingState: Int = filters.findInstance<SortingFilter>()?.state ?: 0
         val sorting: String = SORTING.values.elementAt(sortingState)
 
@@ -113,18 +112,19 @@ class Itchio : HttpSource(), ConfigurableSource {
         return GET("$baseUrl$sorting$price$tags")
     }
 
-    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
-
     override fun searchMangaParse(response: Response): MangasPage = comicsParse(response)
 
     override fun getFilterList(): FilterList {
         try {
             fetchTags()
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
+
         return FilterList(
             SortingFilter(),
             PriceFilter(),
             TagsFilter(cachedTags?.map { it.name } ?: emptyList()),
+            Filter.Header("Below will ignore other filters"),
+            UserFilter(),
         )
     }
 
@@ -233,7 +233,7 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
 
         // donation based - can't get
-        throw UnsupportedOperationException("Purchase comic to display chapters")
+        throw Exception("Purchase comic to display chapter")
     }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
@@ -262,8 +262,13 @@ class Itchio : HttpSource(), ConfigurableSource {
 //            ),
 //        )
 
+        // Reindex download to show in UI that chapter was updated
+        // TODO: make it optional
+        val downloadCache: DownloadCache = Injekt.get()
+        downloadCache.invalidateCache()
+
         // Task failed successfully
-        throw UnsupportedOperationException("Download completed")
+        throw Exception("Download completed")
     }
 
     override fun prepareNewChapter(chapter: SChapter, manga: SManga) {
@@ -282,7 +287,8 @@ class Itchio : HttpSource(), ConfigurableSource {
         }
         val mangaDir = base.findOrCreateDir(mangaName)
 
-        val chapterFile = mangaDir.createFile("${chapter.scanlator}_${chapter.name}") ?: throw Exception("Could not create chapter file")
+        val dummyExtension = ".cbz" // so it appear as downloaded when reindexing downloads
+        val chapterFile = mangaDir.createFile("${chapter.scanlator}_${chapter.name}$dummyExtension") ?: throw Exception("Could not create chapter file")
 
         // Download file contents
         downloadToFile(chapter.url, chapterFile)
@@ -309,6 +315,13 @@ class Itchio : HttpSource(), ConfigurableSource {
     }
 
     // TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
+//    override fun relatedMangaListRequest(manga: SManga): Request {
+//        return super.relatedMangaListRequest(manga)
+//    }
+//
+//    override fun relatedMangaListParse(response: Response): List<SManga> {
+//        return super.relatedMangaListParse(response)
+//    }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
@@ -324,6 +337,8 @@ class Itchio : HttpSource(), ConfigurableSource {
             setDefaultValue(availableUris.firstOrNull()?.uri?.toString())
         }.also(screen::addPreference)
     }
+
+    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
 
     fun Uri.readablePath(): String =
         toString().substringAfter("tree/").replace("%3A", "/").replace("%2F", "/")
