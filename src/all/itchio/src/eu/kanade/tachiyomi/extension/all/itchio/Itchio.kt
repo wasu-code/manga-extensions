@@ -1,49 +1,33 @@
 package eu.kanade.tachiyomi.extension.all.itchio
 
-import android.app.Application
-import android.content.SharedPreferences
-import android.net.Uri
-import androidx.preference.ListPreference
-import androidx.preference.PreferenceScreen
-import com.hippo.unifile.UniFile
-import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
-import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.asJsoup
-import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
 import keiyoushi.utils.tryParse
+import kuchihige.utils.DownloadableHttpSource
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
-import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.getValue
 
-private const val SEPARATOR = " • "
 private val REGEX_URL_CHAPTER = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/.+")
 private val REGEX_URL_USERPAGE = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/?$")
 
-class Itchio : HttpSource(), ConfigurableSource {
+class Itchio : DownloadableHttpSource() {
     override val baseUrl = "https://itch.io/comics"
     override val lang = "all"
     override val supportsLatest = true
     override val name = "Itch.io"
 
-    private val context by lazy { Injekt.get<Application>() }
-    private val preferences: SharedPreferences by getPreferencesLazy()
     override val client = network.client.newBuilder()
         .addInterceptor(TextInterceptor())
         .build()
@@ -236,83 +220,12 @@ class Itchio : HttpSource(), ConfigurableSource {
         throw Exception("Purchase comic to display chapter")
     }
 
-    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
-        val fileExtension = chapter.name.substringAfterLast(".").lowercase()
+    override fun getFileExtension(chapter: SChapter): String = chapter.name.substringAfterLast(".").lowercase()
 
-        when (fileExtension) {
-            // TODO use page interceptor and pdf as lib
-            "pdf" -> handleDownload(chapter, "localpdf")
-            in listOf("zip", "cbz", "epub") -> handleDownload(chapter, "downloads/$name (${lang.uppercase()})")
-            else -> throw UnsupportedOperationException("Unsupported file format")
-        }
-
-        // Show dummy page to let user know download is complete (and so it doesn't throw errors)
-        // TODO add actual dummy pages when dealing with pdf
-//        return Observable.just(
-//            listOf(
-//                Page(
-//                    0,
-//                    "",
-//                    TextInterceptorHelper.createUrl(
-//                        "Download completed",
-//                        "Reopen the chapter to start reading",
-//                    ),
-//                    file.uri,
-//                ),
-//            ),
-//        )
-
-        // Reindex download to show in UI that chapter was updated
-        // TODO: make it optional
-        val downloadCache: DownloadCache = Injekt.get()
-        downloadCache.invalidateCache()
-
-        // Task failed successfully
-        throw Exception("Download completed")
-    }
-
-    override fun prepareNewChapter(chapter: SChapter, manga: SManga) {
-        chapter.scanlator = chapter.scanlator + SEPARATOR + manga.title
-    }
-
-    fun handleDownload(chapter: SChapter, baseDir: String): UniFile {
-        val mangaName = chapter.scanlator?.substringAfter(SEPARATOR) ?: "Unknown"
-
-        val mihonUri = preferences.getString("MIHON_URI", null)?.let { Uri.parse(it) }
-            ?: throw IllegalStateException("MIHON_URI not set")
-        val downloadRoot = UniFile.fromUri(context, mihonUri) ?: throw Exception("Invalid MIHON_URI")
-
-        val base = baseDir.split("/").fold(downloadRoot) { acc, dir ->
-            acc.findOrCreateDir(dir)
-        }
-        val mangaDir = base.findOrCreateDir(mangaName)
-
-        val dummyExtension = ".cbz" // so it appear as downloaded when reindexing downloads
-        val chapterFile = mangaDir.createFile("${chapter.scanlator}_${chapter.name}$dummyExtension") ?: throw Exception("Could not create chapter file")
-
-        // Download file contents
-        downloadToFile(chapter.url, chapterFile)
-        return chapterFile
-    }
-
-    fun UniFile.findOrCreateDir(name: String): UniFile {
-        return findFile(name) ?: createDirectory(name)!!
-    }
-
-    fun downloadToFile(url: String, targetFile: UniFile) {
-        val request = GET(url)
-        val response = network.client.newCall(request).execute()
-
-        if (response.code == 401) throw Exception("Unauthorized. Login in WebView")
-        if (response.code == 403) throw Exception("Forbidden. Refresh chapter list")
-        if (!response.isSuccessful) throw Exception("Unexpected code ${response.code}: ${response.message}")
-
-        response.body.byteStream().use { input ->
-            targetFile.openOutputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-    }
+    override val downloadErrors = mapOf(
+        401 to "Unauthorized. Login in WebView",
+        403 to "Forbidden. Refresh chapter list",
+    )
 
     // TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
 //    override fun relatedMangaListRequest(manga: SManga): Request {
@@ -323,25 +236,7 @@ class Itchio : HttpSource(), ConfigurableSource {
 //        return super.relatedMangaListParse(response)
 //    }
 
-    override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        ListPreference(screen.context).apply {
-            key = "MIHON_URI"
-            val appName = context.applicationInfo.loadLabel(context.packageManager)
-            title = "$appName's root directory"
-            summary = """
-                Same as in "Settings » Data and storage » Storage location".
-            """.trimIndent()
-            val availableUris = context.contentResolver.persistedUriPermissions
-            entries = availableUris.map { it.uri.readablePath() }.toTypedArray()
-            entryValues = availableUris.map { it.uri.toString() }.toTypedArray()
-            setDefaultValue(availableUris.firstOrNull()?.uri?.toString())
-        }.also(screen::addPreference)
-    }
-
     private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
-
-    fun Uri.readablePath(): String =
-        toString().substringAfter("tree/").replace("%3A", "/").replace("%2F", "/")
 
     override fun pageListParse(response: Response): List<Page> = throw UnsupportedOperationException("Not Used")
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException("Not Used")

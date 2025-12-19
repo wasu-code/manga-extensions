@@ -4,6 +4,7 @@ coroutines_version = "1.6.4"
 serialization_version = "1.4.0"
 preferenceKtxVersion = "1.2.1"
 documentfileVersion = "1.1.0"
+unifileVersion = "e0def6b3dc"
 
 [libraries]
 gradle-agp = { module = "com.android.tools.build:gradle", version = "8.6.1" }
@@ -11,8 +12,8 @@ gradle-kotlin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.
 gradle-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin_version" }
 gradle-kotlinter = { module = "org.jmailen.gradle:kotlinter-gradle", version = "3.13.0" }
 
-tachiyomi-lib = { module = "com.github.keiyoushi:extensions-lib", version = "v1.4.2.1" }
-#tachiyomi-lib = { module = "com.github.komikku-app:extensions-lib", version = "1.7.0" }
+#tachiyomi-lib = { module = "com.github.keiyoushi:extensions-lib", version = "v1.4.2.1" }
+tachiyomi-lib = { module = "com.github.komikku-app:extensions-lib", version = "1.7.0" }
 #tachiyomi-lib = { module = "com.github.mihonapp:extensions-lib", version = "1.6.0-rc1" }
 
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin_version" }
@@ -29,6 +30,7 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version = "5.0.0-alpha.11" }
 quickjs = { module = "app.cash.quickjs:quickjs-android", version = "0.9.2" }
 preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preferenceKtxVersion" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfileVersion" }
+unifile = { module = "com.github.tachiyomiorg:unifile", version.ref = "unifileVersion" }
 
 [bundles]
 common = ["kotlin-stdlib", "coroutines-core", "coroutines-android", "injekt-core", "rxjava", "kotlin-protobuf", "kotlin-json", "jsoup", "okhttp", "tachiyomi-lib", "quickjs"]

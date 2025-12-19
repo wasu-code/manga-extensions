@@ -6,9 +6,6 @@ import eu.kanade.tachiyomi.source.model.SManga
  * Minimal compile-time stub for DownloadCache.
  */
 class DownloadCache {
-    fun addChapter(name: String, mangaDir: UniFile, manga: SManga) {
-        throw NotImplementedError("Stub - should be provided by host app at runtime")
-    }
 
     fun invalidateCache() {
         throw NotImplementedError("Stub - should be provided by host app at runtime")

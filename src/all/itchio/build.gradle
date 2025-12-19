@@ -9,6 +9,6 @@ apply from: "$rootDir/common.gradle"
 
 dependencies {
     compileOnly(project(":lib:hostapistubs"))
-    compileOnly("com.github.tachiyomiorg:unifile:e0def6b3dc")
+    compileOnly(libs.unifile)
     implementation(project(":lib:textinterceptor"))
 }

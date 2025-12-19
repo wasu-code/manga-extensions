@@ -30,4 +30,6 @@ android {
 
 dependencies {
     compileOnly(versionCatalogs.named("libs").findBundle("common").get())
+    compileOnly(project(":lib:hostapistubs"))
+    compileOnly(libs.unifile)
 }
