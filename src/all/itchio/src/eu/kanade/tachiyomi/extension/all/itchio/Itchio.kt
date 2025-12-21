@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.extension.all.itchio
 
-import eu.kanade.tachiyomi.lib.textinterceptor.TextInterceptor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.source.model.Filter
@@ -27,10 +26,6 @@ class Itchio : DownloadableHttpSource() {
     override val lang = "all"
     override val supportsLatest = true
     override val name = "Itch.io"
-
-    override val client = network.client.newBuilder()
-        .addInterceptor(TextInterceptor())
-        .build()
 
 //    https://itch.io/my-purchases
 
@@ -226,15 +221,6 @@ class Itchio : DownloadableHttpSource() {
         401 to "Unauthorized. Login in WebView",
         403 to "Forbidden. Refresh chapter list",
     )
-
-    // TODO komikku recommendations https://itch.io/games-like/3108307/the-cummoner-26-teachers-petting
-//    override fun relatedMangaListRequest(manga: SManga): Request {
-//        return super.relatedMangaListRequest(manga)
-//    }
-//
-//    override fun relatedMangaListParse(response: Response): List<SManga> {
-//        return super.relatedMangaListParse(response)
-//    }
 
     private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
 
