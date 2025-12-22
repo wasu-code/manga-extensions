@@ -27,8 +27,6 @@ class Itchio : DownloadableHttpSource() {
     override val supportsLatest = true
     override val name = "Itch.io"
 
-//    https://itch.io/my-purchases
-
     private fun comicsParse(response: Response): MangasPage {
         val document = response.asJsoup()
         val cards = document.select(".game_grid_widget .game_cell")
@@ -45,7 +43,7 @@ class Itchio : DownloadableHttpSource() {
         return MangasPage(comics, hasNextPage)
     }
 
-    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/free?page=$page&format=html")
+    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl?page=$page&format=html")
 
     override fun popularMangaParse(response: Response): MangasPage = comicsParse(response)
 
@@ -68,7 +66,7 @@ class Itchio : DownloadableHttpSource() {
         // Handle showing user page
         if (query.matches(REGEX_URL_USERPAGE)) return GET(query)
         val user = filters.findInstance<UserFilter>()?.state
-        if (user != null) return GET("https://$user.itch.io/")
+        if (user != null && user.isNotBlank()) return GET("https://$user.itch.io/")
 
         // Handle searching
         if (query.isNotBlank()) return GET("https://itch.io/search?q=$query&classification=comic")
@@ -88,7 +86,7 @@ class Itchio : DownloadableHttpSource() {
             ?.joinToString("") { it.url }
             ?: ""
 
-        return GET("$baseUrl$sorting$price$tags")
+        return GET("$baseUrl$sorting$price$tags?page=$page&format=html")
     }
 
     override fun searchMangaParse(response: Response): MangasPage = comicsParse(response)
