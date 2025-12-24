@@ -21,6 +21,9 @@ import java.util.Locale
 private val REGEX_URL_CHAPTER = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/.+")
 private val REGEX_URL_USERPAGE = Regex("^https?://([a-zA-Z0-9-]+\\.)+itch\\.io/?$")
 
+// TODO: check if this is sufficient
+private val REGEX_TIME_AGO = Regex("""(\d+) (second|minute|hour|day|week)s? ago""")
+
 class Itchio : DownloadableHttpSource() {
     override val baseUrl = "https://itch.io/comics"
     override val lang = "all"
@@ -151,7 +154,10 @@ class Itchio : DownloadableHttpSource() {
         val purchasedBanner = document.selectFirst(".purchase_banner")
         // get purchased
         if (purchasedBanner != null) {
-            val ownershipReason = purchasedBanner.selectFirst(".ownership_reason")?.text()
+            val ownershipReason = purchasedBanner.selectFirst(".ownership_reason")
+                ?.text()
+                ?.replace(REGEX_TIME_AGO, "")
+                ?.trim()
             val fileListUrl = purchasedBanner.selectFirst("a")!!.absUrl("href")
             val fileListResponse = network.client.newCall(
                 GET(fileListUrl),
@@ -185,7 +191,7 @@ class Itchio : DownloadableHttpSource() {
                         it.selectFirst(".file_size")?.text(),
                     ).joinToString()
                 }
-            }
+            }.reversed()
         }
 
         val directDownloads = document.select(".upload:has(.download_btn)")
@@ -206,7 +212,7 @@ class Itchio : DownloadableHttpSource() {
                                 ?.attr("title"),
                         )
                 }
-            }
+            }.reversed()
         }
 
         // donation based - can't get
