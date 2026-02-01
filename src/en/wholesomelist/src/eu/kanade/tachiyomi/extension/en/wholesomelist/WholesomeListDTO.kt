@@ -62,6 +62,7 @@ data class ListResponse(
 @Serializable
 data class ListEntry(
     private val uuid: String,
+    val id: Int,
     val title: String,
     val author: String = "",
     val hm: String? = null,
