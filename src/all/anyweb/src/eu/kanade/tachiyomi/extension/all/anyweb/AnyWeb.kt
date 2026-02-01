@@ -109,8 +109,17 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
                 ?: document.selectFirst("meta[name=title]")?.attr("content")
                 ?: document.title()
             author = document.selectFirst("meta[name=author]")?.attr("content")
-            description = document.selectFirst("meta[property=og:description]")?.attr("content")
-                ?: document.selectFirst("meta[name=description]")?.attr("content")
+            description = (
+                document.selectFirst("meta[property=og:description]")?.attr("content")
+                    ?: document.selectFirst("meta[name=description]")?.attr("content")
+                )
+                .let { desc ->
+                    val url = document.location()
+                    listOfNotNull(
+                        desc,
+                        "|[$url]($url)|\n|---|", // url inside markdown table
+                    ).joinToString("\n\n")
+                }
             thumbnail_url = document.selectFirst("meta[property=og:image]")?.attr("content")
                 ?: document.selectFirst("meta[name=image]")?.attr("content")
                 ?: document.selectFirst("img")?.attr("src")
