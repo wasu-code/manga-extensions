@@ -36,24 +36,6 @@ data class LatestEntry(
     val url = link
 }
 
-/*
-{
-			"siteTags": {
-                "tags": [
-                    "sole female",
-                    "sole male",
-					"schoolgirl uniform",
-                    "mosaic censorship",
-                    "defloration",
-                    "schoolboy uniform",
-                    "condom",
-                    "virginity"
-                ],
-                "characters": []
-            },
-		},
- */
-
 @Serializable
 data class ListResponse(
     val table: List<ListEntry>,
@@ -61,7 +43,7 @@ data class ListResponse(
 
 @Serializable
 data class ListEntry(
-    private val uuid: String,
+    val uuid: String,
     val id: Int,
     val title: String,
     val author: String = "",

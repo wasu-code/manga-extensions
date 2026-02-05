@@ -6,8 +6,10 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
+import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.utils.parseAs
 import kuchihige.source.AggregatorSource
+import kuchihige.source.TargetSource
 import kuchihige.utils.get
 import okhttp3.Request
 import okhttp3.Response
@@ -102,35 +104,47 @@ class WholesomeList : AggregatorSource() {
             }
         }
 
-        val mangas = filtered.map {
-            SManga.create().apply {
-                title = it.title
-                author = it.author
-                genre = it.tags.joinToString()
-                description = it.description
-                thumbnail_url = it.thumbnail_url
-                status = SManga.COMPLETED
-                update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
-                initialized = true
-                setUrlWithoutDomain(it.url)
-            }
-        }
-
+        val mangas = filtered.map { it.toSManga() }
         return MangasPage(mangas, false)
     }
 
     override fun mangaDetailsParse(response: Response): SManga {
-        TODO("Not yet implemented")
+        val document = response.asJsoup()
+        val id = document.selectFirst("div:has(h1) + div > p:last-child")
+            ?.text()?.removePrefix("#")?.toIntOrNull()
+        val manga = wholesomeList.find { it.id == id } ?: throw Exception("Manga not found")
+        return manga.toSManga()
     }
 
-//    override fun getSourceList(manga: SManga): List<TargetSource> {
-//        mapOf(
-//            "nh" to "eu.kanade.tachiyomi.extension.all.nhentai",
-//            "eh" to "eu.kanade.tachiyomi.extension.all.ehentai",
-//            "im" to "eu.kanade.tachiyomi.extension.all.cubari",
-//        )
-//        return super.getSourceList(manga)
-//    }
+    override fun getSourceList(manga: SManga): List<TargetSource> {
+        val wholesomeManga = wholesomeList.find { it.uuid == manga.url.substringAfterLast("/") } ?: return emptyList()
+
+        return listOfNotNull(
+            wholesomeManga.nh?.let {
+                TargetSource(
+                    name = "\uD80C\uDDA9n\uD80C\uDDAA NHentai",
+                    query = it.substringAfterLast("/"),
+                    packageName = "eu.kanade.tachiyomi.extension.all.nhentai",
+                )
+            },
+            // The below won't work for forks with delegated sources
+            wholesomeManga.eh?.let {
+                TargetSource(
+                    name = "E-Hentai",
+                    query = manga.title,
+                    packageName = "eu.kanade.tachiyomi.extension.all.ehentai",
+                )
+            },
+            wholesomeManga.im?.let {
+                TargetSource(
+                    name = "Image Chest",
+                    query = it,
+                    packageName = "eu.kanade.tachiyomi.extension.all.cubari",
+                    note = "Through Cubari extension",
+                )
+            },
+        )
+    }
 
     override fun getFilterList(): FilterList {
         return FilterList(
@@ -195,6 +209,23 @@ class WholesomeList : AggregatorSource() {
     class AuthorFilter : Filter.Text("Author")
     class ParodyFilter : Filter.TriState("Parody")
     // todo isParody T/F and parody of ... contains
+
+    // TODO settings with links to install extensions required
+
+    // Helpers
+    fun ListEntry.toSManga() = this.let {
+        SManga.create().apply {
+            title = it.title
+            author = it.author
+            genre = it.tags.joinToString()
+            description = it.description
+            thumbnail_url = it.thumbnail_url
+            status = SManga.COMPLETED
+            update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
+            initialized = true
+            setUrlWithoutDomain(it.url)
+        }
+    }
 
     // Unused
     override fun searchMangaParse(response: Response): MangasPage = throw UnsupportedOperationException("Not Used")

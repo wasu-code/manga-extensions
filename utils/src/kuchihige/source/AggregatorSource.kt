@@ -19,17 +19,18 @@ abstract class AggregatorSource : HttpSource() {
             SChapter.create().apply {
                 name = it.name
                 url = it.packageName + "/" + it.query
+                scanlator = it.note
             }
         } + listOf(
             SChapter.create().apply {
-                name = "General search"
+                name = "\uD83D\uDD0D Global search"
                 url = "/" + manga.title
             })
     }
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not Used")
 
     open fun getSourceList(manga: SManga) : List<TargetSource> {
-        return listOf()
+        return emptyList()
     }
 
     override fun imageUrlParse(response: Response): String {
@@ -45,7 +46,7 @@ abstract class AggregatorSource : HttpSource() {
             putExtra("filter", packageName)
         }
         context.startActivity(searchIntent)
-        return Observable.empty()
+        throw Exception("Opening manga...")
     }
 
     override fun pageListParse(response: Response): List<Page> {
@@ -57,5 +58,6 @@ abstract class AggregatorSource : HttpSource() {
 data class TargetSource(
     val name: String,
     val query: String,
-    val packageName: String?
+    val packageName: String?,
+    val note: String? = null
 )
