@@ -22,13 +22,15 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
 
-val urlRegex = """^(?:https?://)?(?:[\w-]+\.)+[a-z]{2,6}(?:/\S*)?$""".toRegex()
+val URL_REGEX = """^(?:https?://)?(?:[\w-]+\.)+[a-z]{2,6}(?:/\S*)?$""".toRegex()
 
 /** Has two capturing groups: optional index depth and url.
  * If index depth is provided should be treated as index.
  * Used when saving anime URL
  */
-val anyWebUrlRegex = """^http://(?:(\d+)\.)?anyweb\.invalid/(.*)$""".toRegex()
+val ANYWEB_URL_REGEX = """^http://(?:(\d+)\.)?anyweb\.invalid/(.*)$""".toRegex()
+val TITLE_CLEANUP_REGEX = """\s*[-–—|]\s+[^-–—|]+$""".toRegex()
+
 const val INDEX_PREFIX = "index:"
 
 const val EXCLUDE_SELECTOR_DEFAULTS = "nav, footer, header, aside, .comments"
@@ -63,7 +65,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
      *
      * */
     fun unwrapUrl(url: String): Triple<Boolean, Int?, String> {
-        val match = anyWebUrlRegex.matchEntire(url)
+        val match = ANYWEB_URL_REGEX.matchEntire(url)
 
         // Standalone chapter
         if (match == null) return Triple(false, null, url)
@@ -79,7 +81,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> {
         val websiteUrl = query.removePrefix(INDEX_PREFIX).let { stripped ->
-            require(urlRegex.matches(stripped)) { "Query is not a URL" }
+            require(URL_REGEX.matches(stripped)) { "Query is not a URL" }
             stripped.takeIf { it.startsWith("http://") || it.startsWith("https://") }
                 ?: "http://$stripped"
         }
@@ -105,9 +107,11 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
 
     override fun mangaDetailsParse(document: Document): SManga {
         return SManga.create().apply {
-            title = document.selectFirst("meta[property=og:title]")?.attr("content")
-                ?: document.selectFirst("meta[name=title]")?.attr("content")
-                ?: document.title()
+            title = (
+                document.selectFirst("meta[property=og:title]")?.attr("content")
+                    ?: document.selectFirst("meta[name=title]")?.attr("content")
+                    ?: document.title()
+                ).replace(TITLE_CLEANUP_REGEX, "")
             author = document.selectFirst("meta[name=author]")?.attr("content")
             description = (
                 document.selectFirst("meta[property=og:description]")?.attr("content")
