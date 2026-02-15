@@ -1,8 +1,13 @@
 ext {
     extName = "AnyWebpage Scraper"
     extClass = ".AnyWeb"
-    extVersionCode = 3
+    extVersionCode = 4
     isNsfw = false
 }
 
 apply from: "$rootDir/common.gradle"
+
+dependencies {
+    //noinspection UseTomlInstead
+    compileOnly("androidx.preference:preference-ktx:1.2.1")
+}

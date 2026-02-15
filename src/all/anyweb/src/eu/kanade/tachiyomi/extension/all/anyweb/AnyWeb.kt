@@ -1,9 +1,12 @@
 package eu.kanade.tachiyomi.extension.all.anyweb
 
 import android.content.SharedPreferences
+import android.content.res.Resources
 import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
+import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.Filter
@@ -21,6 +24,7 @@ import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
+import java.net.URL
 
 val URL_REGEX = """^(?:https?://)?(?:[\w-]+\.)+[a-z]{2,6}(?:/\S*)?$""".toRegex()
 
@@ -236,12 +240,75 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
         val checkSelector = preferences.getBoolean("CHECK_SELECTOR", true)
         var checkSize = preferences.getBoolean("CHECK_SIZE", false)
         val checkDimensions = preferences.getBoolean("CHECK_DIMENSIONS", false)
+        val preferHighResolution by lazy { preferences.getBoolean("PREFER_HIGH_RESOLUTION", false) }
 
         val keywords = excludeKeywords.split(",").map { it.trim() }
         val urlKeywords = excludeUrlKeywords.split(",").map { it.trim() }
 
+        data class SrcCandidate(
+            val url: String,
+            val widthPx: Int,
+        )
+
+        val display by lazy { Resources.getSystem().displayMetrics }
+
+        fun String.toWidthPx(): Int? =
+            when {
+                endsWith("w") -> removeSuffix("w").toIntOrNull()
+                endsWith("x") ->
+                    removeSuffix("x").toFloatOrNull()
+                        ?.times(display.widthPixels)
+                        ?.toInt()
+                else -> null
+            }
+
+        fun Element.parseSrcCandidate(raw: String): SrcCandidate? {
+            val parts = raw.trim().split("\\s+".toRegex())
+            val url = parts.firstOrNull() ?: return null
+            val absUrl = URL(URL(baseUri()), url).toString()
+
+            val widthPx = parts.getOrNull(1)?.toWidthPx() ?: return null
+
+            return SrcCandidate(absUrl, widthPx)
+        }
+
+        fun Element.parseSrcSet(
+            attrName: String,
+        ): List<SrcCandidate> =
+            attr(attrName)
+                .takeIf { it.isNotBlank() }
+                ?.split(",")
+                ?.mapNotNull { parseSrcCandidate(it) }
+                .orEmpty()
+
+        fun List<SrcCandidate>.pickBest(): String? {
+            if (isEmpty()) return null
+
+            return if (preferHighResolution) {
+                // Pick the largest available image
+                maxByOrNull { it.widthPx }?.url
+            } else {
+                // Pick the smallest image that is >= display width, fallback to largest
+                sortedBy { it.widthPx }
+                    .firstOrNull { it.widthPx >= display.widthPixels }
+                    ?.url
+                    ?: maxByOrNull { it.widthPx }?.url
+            }
+        }
+
         fun Element.extractImageUrl(): String? {
-            val candidates = listOf(
+            // Try srcset first (highest quality usually lives here)
+            val srcSetAttrs = listOf(
+                "srcset",
+                "data-srcset",
+            )
+
+            for (attr in srcSetAttrs) {
+                val url = parseSrcSet(attr).pickBest()
+                if (url != null) return url
+            }
+
+            val imgAttrs = listOf(
                 "src",
                 "data-src",
                 "data-original",
@@ -252,7 +319,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
                 "data-hi-res-src",
             )
 
-            for (attr in candidates) {
+            for (attr in imgAttrs) {
                 val url = absUrl(attr)
                 if (url.isNotEmpty()) return url
             }
@@ -343,8 +410,23 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
         EditTextPreference(screen.context).apply {
             key = "INFO"
             title = "ℹ️ INFO"
-            summary = "After changing settings below you may need to 'Clear chapter cache' in 'Settings > Data and Storage' in order to apply them to already loaded chapters."
+            summary = "After changing settings below you may need to 'Clear chapter cache' in 'Settings » Data and Storage' in order to apply them to already loaded chapters."
             setEnabled(false)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = "PREFER_HIGH_RESOLUTION"
+            title = "Prefer high resolution"
+            summary = """
+                Will use highest resolution if multiple versions of the image are available.
+                If turned off image will be chosen based on device resolution.
+            """.trimIndent()
+            setDefaultValue(false)
+        }.also(screen::addPreference)
+
+        val pages = PreferenceCategory(screen.context).apply {
+            title = "Parsing pages"
+            summary = "Settings applied when finding pages in chapters"
         }.also(screen::addPreference)
 
         CheckBoxPreference(screen.context).apply {
@@ -352,49 +434,49 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             title = "Exclude using CSS"
             summary = "If the image is inside an element matching the CSS selector provided below it will be excluded."
             setDefaultValue(true)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "EXCLUDE_SELECTOR"
             title = "CSS selector"
             dialogTitle = "Enter CSS selector"
             setDefaultValue(EXCLUDE_SELECTOR_DEFAULTS)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         CheckBoxPreference(screen.context).apply {
             key = "CHECK_KEYWORDS"
             title = "Exclude keywords on element"
             summary = "Images with provided keywords present in their alternative text or title will be excluded."
             setDefaultValue(false)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "EXCLUDE_KEYWORDS"
             title = "Keywords"
             dialogTitle = "Enter keywords (separated by comma)"
             setDefaultValue(EXCLUDE_KEYWORDS_DEFAULTS)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         CheckBoxPreference(screen.context).apply {
             key = "CHECK_URL_KEYWORD"
             title = "Exclude keywords in URL"
             summary = "Images with provided keywords present in their URL will be excluded."
             setDefaultValue(true)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "EXCLUDE_URL_KEYWORDS"
             title = "Keywords"
             dialogTitle = "Enter keywords (separated by comma)"
             setDefaultValue(EXCLUDE_URL_KEYWORDS_DEFAULTS)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         CheckBoxPreference(screen.context).apply {
             key = "CHECK_DIMENSIONS"
             title = "Exclude by dimensions"
             summary = "Will check width and height attributes of images and eliminate all that have at least one of them smaller than specified below."
             setDefaultValue(false)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "MIN_WIDTH"
@@ -404,7 +486,7 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             setOnBindEditTextListener { editText ->
                 editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             }
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "MIN_HEIGHT"
@@ -414,14 +496,14 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             setOnBindEditTextListener { editText ->
                 editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             }
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         CheckBoxPreference(screen.context).apply {
             key = "CHECK_SIZE"
             title = "Exclude by size"
             summary = "⚠️ Activating this option will make additional requests to check image size and therefore will SLOW DOWN chapter loading process (and potentially may trigger anti-spam/bot protection if website has many images). \nTurn it off to speed up loading. "
             setDefaultValue(false)
-        }.also(screen::addPreference)
+        }.also(pages::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "MIN_SIZE"
@@ -432,16 +514,21 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             setOnBindEditTextListener { editText ->
                 editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             }
+        }.also(pages::addPreference)
+
+        val index = PreferenceCategory(screen.context).apply {
+            title = "Parsing chapter index"
+            summary = "Settings applied when detecting chapter links"
         }.also(screen::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "INDEX_DEPTH"
-            title = "Default Index Depth"
+            title = "Default depth"
             dialogTitle = "Set Index Depth"
             summary = """
-                Defines how deep the DOM is scanned to auto-detect chapter links (when searching index:<url>).
+                Defines how deep the DOM is scanned to auto-detect chapter links.
                 Setting this to 1 will detect only links that are placed one after another in the DOM (e.g. in a single list or container).
-                Higher values increase scan depth and may help when dealing with chapters divided into sections.
+                Higher values increase scan depth and may help when dealing with chapters divided into sections or wrapped in styling elements.
                 Setting this value too high might make the extension detect all links on a webpage.
                 Recommended: 1–3.
             """.trimIndent()
@@ -449,14 +536,14 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
             setOnBindEditTextListener { editText ->
                 editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             }
-        }.also(screen::addPreference)
+        }.also(index::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "INDEX_EXCLUDE_SELECTOR"
-            title = "Index: CSS selector to exclude"
+            title = "CSS selector to exclude"
             dialogTitle = "Enter CSS selector"
             setDefaultValue(EXCLUDE_SELECTOR_DEFAULTS)
-        }.also(screen::addPreference)
+        }.also(index::addPreference)
     }
 
     // =================================Not Used=====================================================
