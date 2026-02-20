@@ -215,13 +215,20 @@ class AnyWeb : ConfigurableSource, ParsedHttpSource() {
                 }
             }
 
-            val chapters = bestContainer?.select("a")?.mapIndexed { index, a ->
-                SChapter.create().apply {
-                    name = a.text().ifBlank { "Untitled" }
-                    this.url = a.absUrl("href")
-                    chapter_number = index.toFloat()
-                }
-            } ?: emptyList()
+            val chapters = bestContainer
+                ?.select("a")
+                // remove duplicated links, prefer ones with text
+                ?.groupBy { it.attr("href") }
+                ?.values
+                ?.map { group -> group.maxBy { it.text().isNotBlank() } }
+                // convert to chapters
+                ?.mapIndexed { index, a ->
+                    SChapter.create().apply {
+                        name = a.text().ifBlank { "Untitled" }
+                        this.url = a.absUrl("href")
+                        chapter_number = index.toFloat()
+                    }
+                } ?: emptyList()
 
             chapters.reversed()
         }
