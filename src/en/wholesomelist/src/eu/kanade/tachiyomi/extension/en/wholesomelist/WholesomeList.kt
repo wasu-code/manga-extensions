@@ -6,13 +6,13 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
-import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.utils.parseAs
 import kuchihige.source.AggregatorSource
 import kuchihige.source.TargetSource
 import kuchihige.utils.get
 import okhttp3.Request
 import okhttp3.Response
+import rx.Observable
 
 class WholesomeList : AggregatorSource() {
 
@@ -24,13 +24,13 @@ class WholesomeList : AggregatorSource() {
     val wholesomeList by lazy {
         val req = GET("$baseUrl/api/list")
         val res = client.newCall(req).execute()
-        res.parseAs<ListResponse>().table
+        res.parseAs<ListResponse>().entries
     }
 
     override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/api/features")
 
     override fun popularMangaParse(response: Response): MangasPage {
-        val arr = response.parseAs<FeaturedResponse>().table
+        val arr = response.parseAs<FeaturedResponse>().entries
 
         val mangas = arr.map {
             SManga.create().apply {
@@ -48,7 +48,7 @@ class WholesomeList : AggregatorSource() {
     override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/api/updates")
 
     override fun latestUpdatesParse(response: Response): MangasPage {
-        val arr = response.parseAs<UpdatesResponse>().table
+        val arr = response.parseAs<UpdatesResponse>().entries
 
         val mangas = arr.map {
             SManga.create().apply {
@@ -108,13 +108,13 @@ class WholesomeList : AggregatorSource() {
         return MangasPage(mangas, false)
     }
 
-    override fun mangaDetailsParse(response: Response): SManga {
-        val document = response.asJsoup()
-        val id = document.selectFirst("div:has(h1) + div > p:last-child")
-            ?.text()?.removePrefix("#")?.toIntOrNull()
-        val manga = wholesomeList.find { it.id == id } ?: throw Exception("Manga not found")
-        return manga.toSManga()
+    override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
+        val uuid = manga.url.substringAfterLast("/")
+        val manga = wholesomeList.find { it.uuid == uuid } ?: throw Exception("Manga not found")
+        return Observable.just(manga.toSManga())
     }
+
+    override fun mangaDetailsParse(response: Response): SManga = throw UnsupportedOperationException("Not Used")
 
     override fun getSourceList(manga: SManga): List<TargetSource> {
         val wholesomeManga = wholesomeList.find { it.uuid == manga.url.substringAfterLast("/") } ?: return emptyList()
@@ -140,7 +140,7 @@ class WholesomeList : AggregatorSource() {
                     name = "Image Chest",
                     query = it,
                     packageName = "eu.kanade.tachiyomi.extension.all.cubari",
-                    note = "Through Cubari extension",
+                    note = "using Cubari extension",
                 )
             },
         )
@@ -161,7 +161,7 @@ class WholesomeList : AggregatorSource() {
     class TierFilter : Filter.Select<String>("Tier", arrayOf("All", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-"))
     class PageLengthFilter : Filter.Text("Minimum Page Length")
 
-    // TODO min o max
+    // TODO: min or max pages length
     class TagFilter(name: String) : Filter.CheckBox(name)
     class TagsFilter : Filter.Group<Filter.CheckBox>(
         "Tags",
@@ -205,12 +205,13 @@ class WholesomeList : AggregatorSource() {
         ).map { TagFilter(it) },
     )
 
-    // todo AND or OR for tags
+    // TODO: AND or OR for tags
     class AuthorFilter : Filter.Text("Author")
     class ParodyFilter : Filter.TriState("Parody")
-    // todo isParody T/F and parody of ... contains
+    // TODO: isParody T/F and parody of ... contains
 
-    // TODO settings with links to install extensions required
+    // TODO: settings with links to install extensions required
+    // TODO: compatibility with delegated source: use SEND instead of SEARCH action and direct it to the host app
 
     // Helpers
     fun ListEntry.toSManga() = this.let {

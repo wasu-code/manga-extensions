@@ -5,40 +5,41 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FeaturedResponse(
-    val table: List<FeaturedEntry>,
+    @SerialName("table")
+    val entries: List<FeaturedEntry>,
 )
 
 @Serializable
 data class FeaturedEntry(
-    private val link: String,
+    @SerialName("link")
+    val url: String,
     val title: String,
     val author: String = "",
     val tier: String = "",
     @SerialName("img")
     val thumbnail_url: String = "",
-) {
-    val url = link
-}
+)
 
 @Serializable
 data class UpdatesResponse(
-    val table: List<LatestEntry>,
+    @SerialName("table")
+    val entries: List<LatestEntry>,
 )
 
 @Serializable
 data class LatestEntry(
-    private val link: String,
+    @SerialName("link")
+    val url: String,
     val title: String,
     val author: String = "",
     val tier: String = "",
     val time: Long = 0,
-) {
-    val url = link
-}
+)
 
 @Serializable
 data class ListResponse(
-    val table: List<ListEntry>,
+    @SerialName("table")
+    val entries: List<ListEntry>,
 )
 
 @Serializable
@@ -60,7 +61,7 @@ data class ListEntry(
     val thumbnail_url: String = "",
 ) {
     val url = "https://wholesomelist.com/list/$uuid"
-    val description = listOfNotNull<String>(
+    val description = listOfNotNull(
         note,
         pages?.let { "$pages pages" },
         parody?.let { "Parody of \"$parody\"" },

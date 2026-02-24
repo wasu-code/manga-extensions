@@ -17,15 +17,16 @@ abstract class AggregatorSource : HttpSource() {
     suspend fun getChapterList(manga: SManga): List<SChapter> {
         return getSourceList(manga).map {
             SChapter.create().apply {
-                name = it.name
+                name = "🧩 ${it.name}"
                 url = it.packageName + "/" + it.query
                 scanlator = it.note
             }
         } + listOf(
             SChapter.create().apply {
-                name = "\uD83D\uDD0D Global search"
+                name = "🔎 Global search"
                 url = "/" + manga.title
-            })
+            }
+        )
     }
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not Used")
 

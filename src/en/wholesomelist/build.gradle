@@ -1,5 +1,5 @@
 ext {
-    extName = "Wholecome List"
+    extName = "Wholesome Hentai God List"
     extClass = ".WholesomeList"
     extVersionCode = 1
     isNsfw = true
