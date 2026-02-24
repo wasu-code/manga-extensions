@@ -68,31 +68,51 @@ class WholesomeList : AggregatorSource() {
 
         // filtering
         val tierFilter = filters.get<TierFilter>()
-        val pageLengthFilter = filters.get<PageLengthFilter>()
-        val tagsFilter = filters.get<TagsFilter>()
-        val authorFilter = filters.get<AuthorFilter>()
-        val parodyFilter = filters.get<ParodyFilter>()
         val sortFilter = filters.get<SortFilter>()
 
-        val selectedTier = tierFilter.values[tierFilter.state]
-        val pageLength = pageLengthFilter.state.trim()
-        val selectedTags = tagsFilter.state
+        val selectedTier = tierFilter.let { it.values[it.state] }
+        val pageLength = filters.get<PageLengthFilter>().state.trim()
+        val pageLengthMode = filters.get<PageLengthModeFilter>().let {
+            it.values[it.state]
+        }
+        val tagsMode = filters.get<TagsModeFilter>().let {
+            it.values[it.state]
+        }
+        val selectedTags = filters.get<TagsFilter>().state
             .filter { it.state }
             .map { it.name }
-        val authorQuery = authorFilter.state.trim()
-        val parodyState = parodyFilter.state
+        val authorQuery = filters.get<AuthorFilter>().state.trim()
+        val parodyState = filters.get<ParodyFilter>().state
+        val parodyQuery = filters.get<ParodyOfFilter>().state.trim()
         val sortState = sortFilter.state
 
         var filtered = wholesomeList.filter { manga ->
             (tierFilter.state == 0 || manga.tier == selectedTier) &&
-                (pageLength.isEmpty() || manga.pages == null || manga.pages >= (pageLength.toIntOrNull() ?: 0)) &&
-                (selectedTags.isEmpty() || selectedTags.all { it in manga.tags }) &&
+                (
+                    pageLength.isEmpty() || manga.pages == null || manga.pages.let {
+                        when (pageLengthMode) {
+                            "Min" -> it >= pageLength.toInt()
+                            "Max" -> it <= pageLength.toInt()
+                            else -> throw Exception("Unknown page length mode")
+                        }
+                    }
+                    ) &&
+                (
+                    selectedTags.isEmpty() || selectedTags.let { selected ->
+                        when (tagsMode) {
+                            "AND" -> selected.all { it in manga.tags }
+                            "OR" -> selected.any { it in manga.tags }
+                            else -> throw Exception("Unknown tags mode")
+                        }
+                    }
+                    ) &&
                 (authorQuery.isEmpty() || manga.author.contains(authorQuery, ignoreCase = true)) &&
                 when (parodyState) {
                     Filter.TriState.STATE_INCLUDE -> manga.parody != null
                     Filter.TriState.STATE_EXCLUDE -> manga.parody == null
                     else -> true
-                }
+                } &&
+                (parodyQuery.isEmpty() || manga.parody?.contains(parodyQuery, ignoreCase = true) == true)
         }
 
         if (sortState?.index != 0) {
@@ -148,20 +168,25 @@ class WholesomeList : AggregatorSource() {
 
     override fun getFilterList(): FilterList {
         return FilterList(
+            Filter.Header("ℹ️ Click [Filter] button without setting any fields to display the whole list"),
+            SortFilter(),
+            Filter.Separator(),
             TierFilter(),
             PageLengthFilter(),
+            PageLengthModeFilter(),
             TagsFilter(),
+            TagsModeFilter(),
             AuthorFilter(),
             ParodyFilter(),
+            ParodyOfFilter(),
         )
     }
 
     // Filters
     class SortFilter : Filter.Sort("Sort", arrayOf("Default", "Tier"))
     class TierFilter : Filter.Select<String>("Tier", arrayOf("All", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-"))
-    class PageLengthFilter : Filter.Text("Minimum Page Length")
-
-    // TODO: min or max pages length
+    class PageLengthFilter : Filter.Text("Number of pages")
+    class PageLengthModeFilter : Filter.Select<String>("Number of pages constraint", arrayOf("Min", "Max"))
     class TagFilter(name: String) : Filter.CheckBox(name)
     class TagsFilter : Filter.Group<Filter.CheckBox>(
         "Tags",
@@ -204,11 +229,10 @@ class WholesomeList : AggregatorSource() {
             "Yuri",
         ).map { TagFilter(it) },
     )
-
-    // TODO: AND or OR for tags
+    class TagsModeFilter : Filter.Select<String>("Tags mode", arrayOf("AND", "OR"))
     class AuthorFilter : Filter.Text("Author")
     class ParodyFilter : Filter.TriState("Parody")
-    // TODO: isParody T/F and parody of ... contains
+    class ParodyOfFilter : Filter.Text("Parody of")
 
     // TODO: settings with links to install extensions required
     // TODO: compatibility with delegated source: use SEND instead of SEARCH action and direct it to the host app
