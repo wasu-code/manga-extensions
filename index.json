@@ -34,5 +34,23 @@
         "versionId": 1
       }
     ]
+  },
+  {
+    "name": "Tachiyomi: Wholesome Hentai God List",
+    "pkg": "eu.kanade.tachiyomi.extension.en.wholesomelist",
+    "apk": "tachiyomi-en.wholesomelist-v1.4.1.apk",
+    "lang": "en",
+    "code": 1,
+    "version": "1.4.1",
+    "nsfw": 1,
+    "sources": [
+      {
+        "name": "Wholesome Hentai God List",
+        "lang": "en",
+        "id": "5642310410553887472",
+        "baseUrl": "https://wholesomelist.com",
+        "versionId": 1
+      }
+    ]
   }
 ]
