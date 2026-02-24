@@ -151,7 +151,7 @@ class WholesomeList : AggregatorSource() {
             wholesomeManga.eh?.let {
                 TargetSource(
                     name = "E-Hentai",
-                    query = manga.title,
+                    query = "https://e-hentai.org/g/3510872/0320ce2a1a", // manga.title,
                     packageName = "eu.kanade.tachiyomi.extension.all.ehentai",
                 )
             },
@@ -233,9 +233,6 @@ class WholesomeList : AggregatorSource() {
     class AuthorFilter : Filter.Text("Author")
     class ParodyFilter : Filter.TriState("Parody")
     class ParodyOfFilter : Filter.Text("Parody of")
-
-    // TODO: settings with links to install extensions required
-    // TODO: compatibility with delegated source: use SEND instead of SEARCH action and direct it to the host app
 
     // Helpers
     fun ListEntry.toSManga() = this.let {
