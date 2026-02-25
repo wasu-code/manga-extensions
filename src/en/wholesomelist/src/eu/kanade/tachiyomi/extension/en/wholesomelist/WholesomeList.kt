@@ -151,7 +151,7 @@ class WholesomeList : AggregatorSource() {
             wholesomeManga.eh?.let {
                 TargetSource(
                     name = "E-Hentai",
-                    query = "https://e-hentai.org/g/3510872/0320ce2a1a", // manga.title,
+                    query = manga.title,
                     packageName = "eu.kanade.tachiyomi.extension.all.ehentai",
                 )
             },
