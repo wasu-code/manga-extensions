@@ -116,7 +116,7 @@ class WholesomeList : AggregatorSource() {
         }
 
         if (sortState?.index != 0) {
-            val tierRank = sortFilter.values.withIndex().associate { it.value to it.index }
+            val tierRank = tierFilter.values.withIndex().reversed().associate { it.value to it.index }
             filtered = if (sortState?.ascending == true) {
                 filtered.sortedBy { tierRank[it.tier] }
             } else {
