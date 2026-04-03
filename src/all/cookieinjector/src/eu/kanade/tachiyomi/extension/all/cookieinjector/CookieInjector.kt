@@ -3,14 +3,16 @@ package eu.kanade.tachiyomi.extension.all.cookieinjector
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.widget.Toast
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
+import androidx.preference.Preference
 import androidx.preference.PreferenceScreen
-import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import okhttp3.Cookie
@@ -82,7 +84,7 @@ class CookieInjector : ConfigurableSource {
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
             key = "BROWSER"
-            title = "Select browser to get specific instructions"
+            title = "Tap to select browser"
             summary = BrowserInstruction.valueOf(prefs.getString(key, BrowserInstruction.CHROMIUM.name)!!).content
             entries = BrowserInstruction.values().map { it.title }.toTypedArray()
             entryValues = BrowserInstruction.values().map { it.name }.toTypedArray()
@@ -94,35 +96,36 @@ class CookieInjector : ConfigurableSource {
             }
         }.also(screen::addPreference)
 
-        SwitchPreferenceCompat(screen.context).apply {
-            key = "COPY_TRIGGER"
-            title = "Tap to copy bookmarklet"
-            setDefaultValue(false)
-            setOnPreferenceClickListener {
-                // copy bookmarklet code
-                val clipboard = context.getSystemService("clipboard") as ClipboardManager
-                val clip = ClipData.newPlainText("Cookie Bookmarklet", BOOKMARKLET)
-                clipboard.setPrimaryClip(clip)
-                Toast.makeText(screen.context, "Bookmarklet copied to clipboard", Toast.LENGTH_SHORT).show()
-                // trigger opening browser
-                val intent = Intent().apply {
-                    action = Intent.ACTION_VIEW
-                    data = Uri.parse("http://about:blank")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
+        Preference::class.java
+            .getConstructor(Context::class.java)
+            .newInstance(screen.context)
+            .apply {
+                key = "COPY_TRIGGER"
+                title = "Tap to copy bookmarklet"
+                setOnPreferenceClickListener {
+                    // copy bookmarklet code
+                    val clipboard = context.getSystemService("clipboard") as ClipboardManager
+                    val clip = ClipData.newPlainText("Cookie Bookmarklet", BOOKMARKLET)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(screen.context, "Bookmarklet copied to clipboard", Toast.LENGTH_SHORT).show()
+                    // trigger opening browser
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_VIEW
+                        data = Uri.parse("http://about:blank")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
 
-                true
+                    true
+                }
             }
-            setOnPreferenceChangeListener { pref, _ ->
-                false // prevent from switching to toggled state
-            }
-        }.also(screen::addPreference)
+            .also(screen::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = "COOKIE_JSON"
             title = "Paste cookie JSON"
-            summary = "Format: {\"url\": \"https://example.com\", \"cookie\": \"a=1; b=2\"}"
+            summary = "Format: {\"url\": \"https://example.com\", \"cookie\": \"name1=value1; name2=value2\"}"
+            setDefaultValue("{\"url\": \"https://setcookie.net\", \"cookie\": \"cookieInjectorTest=exampleValue\"}")
 
             setOnPreferenceChangeListener { _, newValue ->
                 val json = newValue.toString().trim()
@@ -159,7 +162,7 @@ class CookieInjector : ConfigurableSource {
                     }
 
                     network.client.cookieJar.saveFromResponse(httpUrl, cookieList)
-                    Toast.makeText(screen.context, "✅ Cookies added for $url", Toast.LENGTH_LONG).show()
+                    Toast.makeText(screen.context, "🍪 Cookies added for \n$url", Toast.LENGTH_LONG).show()
                     true
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -168,5 +171,34 @@ class CookieInjector : ConfigurableSource {
                 }
             }
         }.also(screen::addPreference)
+
+        // Ugly fix because stubs library provide Preference() instead of Preference(context)
+        Preference::class.java
+            .getConstructor(Context::class.java)
+            .newInstance(screen.context)
+            .apply {
+                key = "WEBVIEW_TRIGGER"
+                title = "Open setcookie.net"
+                summary = "Open webview to test cookies added to setcookie.net domain"
+                setOnPreferenceClickListener {
+                    openWebView("https://setcookie.net")
+                    true
+                }
+            }
+            .also(screen::addPreference)
+    }
+
+    /** Open WebView of the host app to specified URL */
+    private fun openWebView(url: String) {
+        val context = Injekt.get<Application>()
+        val intent = Intent().apply {
+            component = ComponentName(context, "eu.kanade.tachiyomi.ui.webview.WebViewActivity")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra("url_key", url)
+            putExtra("source_key", id)
+            putExtra("title_key", "Test your cookies")
+        }
+
+        context.startActivity(intent)
     }
 }
