@@ -25,6 +25,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.utils.getPreferencesLazy
 import okhttp3.Request
 import okhttp3.Response
+import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import kotlin.time.Duration.Companion.days
@@ -115,15 +116,17 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         return MangasPage(mangaList, hasNextPage = false)
     }
 
-    @Suppress("unused")
-    suspend fun getMangaDetails(manga: SManga): SManga {
-        val mangaDir = getInputDir()?.findFile(manga.url) ?: return manga
+    override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
+        val mangaDir = getInputDir()?.findFile(manga.url) ?: return Observable.just(manga)
         val coverFile = getOrCreateCover(mangaDir)
-        return manga.apply {
-            coverFile?.let {
-                thumbnail_url = it.uri.toString()
-            }
-        }
+
+        return Observable.just(
+            manga.apply {
+                coverFile?.let {
+                    thumbnail_url = it.uri.toString()
+                }
+            },
+        )
     }
 
     private fun getOrCreateCover(mangaDir: UniFile): UniFile? {
@@ -167,8 +170,7 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
         return type.startsWith("image/")
     }
 
-    @Suppress("unused")
-    suspend fun getChapterList(manga: SManga): List<SChapter> {
+    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
         val inputDir = getInputDir()
         val mangaDir = inputDir?.findFile(manga.url)?.takeIf { it.isDirectory }
 
@@ -182,7 +184,7 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
             ?.sortedByDescending { it.second }
             ?: emptyList()
 
-        return pdfFilesAndNumbers.map { (pdf, chapterNumber) ->
+        val chapters = pdfFilesAndNumbers.map { (pdf, chapterNumber) ->
             SChapter.create().apply {
                 name = pdf.name?.removeSuffix(".pdf") ?: "chapter"
                 url = "${manga.url}/${pdf.name}"
@@ -190,6 +192,8 @@ class LocalPDF : HttpSource(), ConfigurableSource, UnmeteredSource {
                 chapter_number = chapterNumber.toFloat()
             }
         }
+
+        return Observable.just(chapters)
     }
 
     @Suppress("unused")
